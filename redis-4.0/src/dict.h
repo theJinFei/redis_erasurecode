@@ -181,6 +181,14 @@ unsigned long dictScan(dict *d, unsigned long v, dictScanFunction *fn, dictScanB
 uint64_t dictGetHash(dict *d, const void *key);
 dictEntry **dictFindEntryRefByPtrAndHash(dict *d, const void *oldptr, uint64_t hash);
 
+#ifdef USE_PMDK
+/* PMEM-specific API */
+int dictAddPM(dict *d, void *key, void *val);
+dictEntry *dictAddRawPM(dict *d, void *key);
+dictEntry *dictAddReconstructedPM(dict *d, void *key, void *val);
+int dictReplacePM(dict *d, void *key, void *val);
+#endif
+
 /* Hash table types */
 extern dictType dictTypeHeapStringCopyKey;
 extern dictType dictTypeHeapStrings;

@@ -32,6 +32,12 @@
 #include <math.h>
 #include <ctype.h>
 
+#ifdef USE_PMDK
+#include "obj.h"
+#include "libpmemobj.h"
+#include "libpmem.h"
+#endif
+
 #ifdef __CYGWIN__
 #define strtold(a,b) ((long double)strtod((a),(b)))
 #endif
@@ -55,6 +61,21 @@ robj *createObject(int type, void *ptr) {
     return o;
 }
 
+#ifdef USE_PMDK
+robj *createObjectPM(int type, void *ptr) {
+    robj *o = zmalloc(sizeof(*o));
+
+    o->type = type;
+    o->encoding = OBJ_ENCODING_RAW;
+    o->ptr = ptr;
+    o->refcount = 1;
+
+    /* Set the LRU to the current lruclock (minutes resolution). */
+    o->lru = LRU_CLOCK();
+    return (robj *)o;
+}
+#endif
+
 /* Set a special refcount in the object to make it "shared":
  * incrRefCount and decrRefCount() will test for this special refcount
  * and will not touch the object. This way it is free to access shared
@@ -77,6 +98,15 @@ robj *makeObjectShared(robj *o) {
 robj *createRawStringObject(const char *ptr, size_t len) {
     return createObject(OBJ_STRING, sdsnewlen(ptr,len));
 }
+
+#ifdef USE_PMDK
+/* Create a string object with encoding OBJ_ENCODING_RAW, that is a plain
+ * string object where o->ptr points to a proper sds string.
+ * Located in PM */
+robj *createRawStringObjectPM(const char *ptr, size_t len) {
+    return createObjectPM(OBJ_STRING,sdsnewlenPM(ptr,len));
+}
+#endif
 
 /* Create a string object with encoding OBJ_ENCODING_EMBSTR, that is
  * an object where the sds string is actually an unmodifiable string
@@ -106,6 +136,34 @@ robj *createEmbeddedStringObject(const char *ptr, size_t len) {
     }
     return o;
 }
+
+#ifdef USE_PMDK
+/* Create a string object with encoding OBJ_ENCODING_EMBSTR, that is
+ * an object where the sds string is actually an unmodifiable string
+ * allocated in the same chunk as the object itself.
+ * Allocation takes place in PM */
+robj *createEmbeddedStringObjectPM(const char *ptr, size_t len) {
+    robj *o = zmalloc(sizeof(robj)+sizeof(struct sdshdr8)+len+1);
+    struct sdshdr8 *sh = (void*)(o+1);
+
+    o->type = OBJ_STRING;
+    o->encoding = OBJ_ENCODING_EMBSTR;
+    o->ptr = sh+1;
+    o->refcount = 1;
+    o->lru = LRU_CLOCK();
+
+    sh->len = len;
+    sh->alloc = len;
+    sh->flags = SDS_TYPE_8;
+    if (ptr) {
+        memcpy(sh->buf,ptr,len);
+        sh->buf[len] = '\0';
+    } else {
+        memset(sh->buf,0,len+1);
+    }
+    return (robj *)o;
+}
+#endif
 
 /* Create a string object with EMBSTR encoding if it is smaller than
  * OBJ_ENCODING_EMBSTR_SIZE_LIMIT, otherwise the RAW encoding is
@@ -179,6 +237,32 @@ robj *dupStringObject(const robj *o) {
     }
 }
 
+#ifdef USE_PMDK
+/* Duplicate a string object. New object is created in PM
+ *
+ * The resulting object always has refcount set to 1. */
+robj *dupStringObjectPM(robj *o) {
+    robj *d;
+
+    serverAssert(o->type == OBJ_STRING);
+
+    switch(o->encoding) {
+    case OBJ_ENCODING_RAW:
+    case OBJ_ENCODING_EMBSTR:
+        return createRawStringObjectPM(o->ptr,sdslen(o->ptr));
+        /* return createEmbeddedStringObjectPM(o->ptr,sdslen(o->ptr)); */
+    case OBJ_ENCODING_INT:
+        d = createObjectPM(OBJ_STRING, NULL);
+        d->encoding = OBJ_ENCODING_INT;
+        d->ptr = o->ptr;
+        return d;
+    default:
+        serverPanic("Wrong encoding.");
+        break;
+    }
+}
+#endif
+
 robj *createQuicklistObject(void) {
     quicklist *l = quicklistCreate();
     robj *o = createObject(OBJ_LIST,l);
@@ -244,6 +328,14 @@ void freeStringObject(robj *o) {
         sdsfree(o->ptr);
     }
 }
+
+#ifdef USE_PMDK
+void freeStringObjectPM(robj *o) {
+    if (o->encoding == OBJ_ENCODING_RAW) {
+        sdsfreePM(o->ptr);
+    }
+}
+#endif
 
 void freeListObject(robj *o) {
     if (o->encoding == OBJ_ENCODING_QUICKLIST) {
@@ -324,6 +416,25 @@ void decrRefCount(robj *o) {
         if (o->refcount != OBJ_SHARED_REFCOUNT) o->refcount--;
     }
 }
+
+#ifdef USE_PMDK
+void decrRefCountPM(robj *o) {
+    if (o->refcount <= 0) serverPanic("decrRefCount against refcount <= 0");
+    if (o->refcount == 1) {
+        switch(o->type) {
+        case OBJ_STRING: freeStringObjectPM(o); break;
+        case OBJ_LIST: freeListObject(o); break;
+        case OBJ_SET: freeSetObject(o); break;
+        case OBJ_ZSET: freeZsetObject(o); break;
+        case OBJ_HASH: freeHashObject(o); break;
+        default: serverPanic("Unknown object type"); break;
+        }
+        zfree(o);
+    } else {
+        o->refcount--;
+    }
+}
+#endif
 
 /* This variant of decrRefCount() gets its argument as void, and is useful
  * as free method in data structures that expect a 'void free_object(void*)'

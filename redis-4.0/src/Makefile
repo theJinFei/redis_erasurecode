@@ -125,6 +125,17 @@ ifeq ($(MALLOC),jemalloc)
 	FINAL_LIBS+= ../deps/jemalloc/lib/libjemalloc.a
 endif
 
+ifeq ($(USE_PMDK),yes)
+	DEPENDENCY_TARGETS+= pmdk
+	FINAL_CFLAGS+= -I../deps/pmdk/src/include -I../deps/pmdk/src/libpmemobj -I../deps/pmdk/src/common -DUSE_PMDK
+ifeq ($(NVML_DEBUG),yes)
+	FINAL_LIBS+= ../deps/pmdk/src/debug/libpmemobj.so ../deps/pmdk/src/debug/libpmem.so
+else
+	FINAL_LIBS+= ../deps/pmdk/src/nondebug/libpmemobj.so ../deps/pmdk/src/nondebug/libpmem.so
+endif
+	FINAL_LIBS+= -ldl
+endif
+
 REDIS_CC=$(QUIET_CC)$(CC) $(FINAL_CFLAGS)
 REDIS_LD=$(QUIET_LINK)$(CC) $(FINAL_LDFLAGS)
 REDIS_INSTALL=$(QUIET_INSTALL)$(INSTALL)
@@ -151,6 +162,10 @@ REDIS_BENCHMARK_NAME=redis-benchmark
 REDIS_BENCHMARK_OBJ=ae.o anet.o redis-benchmark.o adlist.o zmalloc.o redis-benchmark.o
 REDIS_CHECK_RDB_NAME=redis-check-rdb
 REDIS_CHECK_AOF_NAME=redis-check-aof
+
+ifeq ($(USE_PMDK),yes)
+	REDIS_SERVER_OBJ+= pmem.o
+endif
 
 all: $(REDIS_SERVER_NAME) $(REDIS_SENTINEL_NAME) $(REDIS_CLI_NAME) $(REDIS_BENCHMARK_NAME) $(REDIS_CHECK_RDB_NAME) $(REDIS_CHECK_AOF_NAME)
 	@echo ""

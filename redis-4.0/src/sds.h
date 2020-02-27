@@ -39,6 +39,10 @@
 #include <stdarg.h>
 #include <stdint.h>
 
+#ifdef USE_PMDK
+#include "libpmemobj.h"
+#endif
+
 typedef char *sds;
 
 /* Note: sdshdr5 is never used, we just access the flags byte directly.
@@ -225,6 +229,13 @@ sds sdscat(sds s, const char *t);
 sds sdscatsds(sds s, const sds t);
 sds sdscpylen(sds s, const char *t, size_t len);
 sds sdscpy(sds s, const char *t);
+
+#ifdef USE_PMDK
+sds sdsnewlenPM(const void *init, size_t initlen);
+sds sdsdupPM(const sds s, void **oid_reference);
+void sdsfreePM(sds s);
+PMEMoid *sdsPMEMoidBackReference(sds s);
+#endif
 
 sds sdscatvprintf(sds s, const char *fmt, va_list ap);
 #ifdef __GNUC__

@@ -472,12 +472,45 @@ void dictObjectDestructor(void *privdata, void *val)
     decrRefCount(val);
 }
 
+#ifdef USE_PMDK
+void dictObjectDestructorPM(void *privdata, void *val)
+{
+    DICT_NOTUSED(privdata);
+
+    if (val == NULL)
+        return; /* Lazy freeing will set value to NULL. */
+
+    TX_BEGIN(server.pm_pool) {
+        decrRefCountPM(val);
+    } TX_ONABORT {
+        serverLog(LL_WARNING,"ERROR: decrementing the PM ref count failed (%s)", __func__);
+    } TX_END
+}
+#endif
+
 void dictSdsDestructor(void *privdata, void *val)
 {
     DICT_NOTUSED(privdata);
 
     sdsfree(val);
 }
+
+#ifdef USE_PMDK
+void dictSdsDestructorPM(void *privdata, void *val)
+{
+    PMEMoid *kv_PM_oid;
+
+    DICT_NOTUSED(privdata);
+
+    TX_BEGIN(server.pm_pool) {
+        kv_PM_oid = sdsPMEMoidBackReference(val);
+        sdsfreePM(val);
+        pmemRemoveFromPmemList(*kv_PM_oid);
+    } TX_ONABORT {
+        serverLog(LL_WARNING,"ERROR: removing an element from PM failed (%s)", __func__);
+    } TX_END
+}
+#endif
 
 int dictObjKeyCompare(void *privdata, const void *key1,
         const void *key2)
@@ -580,6 +613,18 @@ dictType dbDictType = {
     dictSdsDestructor,          /* key destructor */
     dictObjectDestructor   /* val destructor */
 };
+
+#ifdef USE_PMDK
+/* Db->dict, keys are sds strings, vals are Redis objects. */
+dictType dbDictTypePM = {
+    dictSdsHash,                /* hash function */
+    NULL,                       /* key dup */
+    NULL,                       /* val dup */
+    dictSdsKeyCompare,          /* key compare */
+    dictSdsDestructorPM,          /* key destructor */
+    dictObjectDestructorPM   /* val destructor */
+};
+#endif
 
 /* server.lua_scripts sha (as sds string) -> scripts (as robj) cache. */
 dictType shaScriptObjectDictType = {
@@ -1383,6 +1428,11 @@ void initServerConfig(void) {
     server.syslog_ident = zstrdup(CONFIG_DEFAULT_SYSLOG_IDENT);
     server.syslog_facility = LOG_LOCAL0;
     server.daemonize = CONFIG_DEFAULT_DAEMONIZE;
+#ifdef USE_PMDK
+    server.pm_file_path = NULL;
+    server.pm_file_size = CONFIG_DEFAULT_PM_FILE_SIZE;
+    server.pm_reconstruct_required = false;
+#endif
     server.supervised = 0;
     server.supervised_mode = SUPERVISED_NONE;
     server.aof_state = AOF_OFF;
@@ -1877,6 +1927,14 @@ void initServer(void) {
 
     /* Create the Redis databases, and initialize other internal state. */
     for (j = 0; j < server.dbnum; j++) {
+#ifdef USE_PMDK
+        if (server.persistent) {
+            server.db[j].dict = dictCreate(&dbDictTypePM,NULL);
+            
+            pm_type_root_type_id = TOID_TYPE_NUM(struct redis_pmem_root);
+            pm_type_key_val_pair_PM = TOID_TYPE_NUM(struct key_val_pair_PM);
+        } else
+#endif
         server.db[j].dict = dictCreate(&dbDictType,NULL);
         server.db[j].expires = dictCreate(&keyptrDictType,NULL);
         server.db[j].blocking_keys = dictCreate(&keylistDictType,NULL);
@@ -3710,6 +3768,51 @@ int redisIsSupervised(int mode) {
     return 0;
 }
 
+#ifdef USE_PMDK
+void initPersistentMemory(void) {
+    PMEMoid oid;
+    struct redis_pmem_root *root;
+    
+
+    long long start = ustime();
+    char pmfile_hmem[64];
+    bytesToHuman(pmfile_hmem, server.pm_file_size);
+    serverLog(LL_NOTICE,"Start init Persistent memory file %s size %s",
+            server.pm_file_path, pmfile_hmem);
+
+    /* Create new PMEM pool file. */
+    server.pm_pool = pmemobj_create(server.pm_file_path, PM_LAYOUT_NAME, server.pm_file_size, 0666);
+
+    if (server.pm_pool == NULL) {
+        /* Open the existing PMEM pool file. */
+        server.pm_pool = pmemobj_open(server.pm_file_path, PM_LAYOUT_NAME);
+        server.pm_rootoid = POBJ_ROOT(server.pm_pool, struct redis_pmem_root);
+	server.pm_reconstruct_required = true;
+
+        if (server.pm_pool == NULL) {
+            serverLog(LL_WARNING,"Cannot init persistent memory poolset file "
+                "%s size %s", server.pm_file_path, pmfile_hmem);
+            exit(1);
+        }
+    } else {
+        server.pm_rootoid = POBJ_ROOT(server.pm_pool, struct redis_pmem_root);
+        root = pmemobj_direct(server.pm_rootoid.oid);
+        root->num_dict_entries = 0;
+    }
+
+    /* Get pool UUID from root object's OID. */
+    oid = pmemobj_root(server.pm_pool, 1);
+    server.pool_uuid_lo = oid.pool_uuid_lo;
+
+    serverLog(LL_NOTICE,"Init Persistent memory file %s time %.3f "
+            "seconds",
+            server.pm_file_path,
+			(float)(ustime()-start)/1000000);
+    server.persistent = true;
+
+    resetServerSaveParams();
+}
+#endif
 
 int main(int argc, char **argv) {
     struct timeval tv;
@@ -3864,6 +3967,12 @@ int main(int argc, char **argv) {
     int background = server.daemonize && !server.supervised;
     if (background) daemonize();
 
+#ifdef USE_PMDK
+    if (server.pm_file_path) {
+        initPersistentMemory();
+    }
+#endif
+
     initServer();
     if (background || server.pidfile) createPidFile();
     redisSetProcTitle(argv[0]);
@@ -3877,6 +3986,17 @@ int main(int argc, char **argv) {
         linuxMemoryWarnings();
     #endif
         moduleLoadFromQueue();
+#ifdef USE_PMDK
+        if (server.pm_reconstruct_required) {
+            long long start = ustime();
+            if (pmemReconstruct() == C_OK) {
+                serverLog(LL_NOTICE,"DB loaded from PMEM: %.3f seconds",(float)(ustime()-start)/1000000);
+            } else if (errno != ENOENT) {
+                serverLog(LL_WARNING,"Fatal error loading the DB from PMEM: %s. Exiting.",strerror(errno));
+                exit(1);
+            }
+	}
+#endif
         loadDataFromDisk();
         if (server.cluster_enabled) {
             if (verifyClusterConfigWithData() == C_ERR) {

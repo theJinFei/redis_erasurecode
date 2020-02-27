@@ -49,6 +49,39 @@
 #include <lua.h>
 #include <signal.h>
 
+#ifdef USE_PMDK
+#include <stdbool.h>
+#include <sys/queue.h>
+#include "libpmemobj.h"
+
+#define PM_LAYOUT_NAME "store_db"
+
+POBJ_LAYOUT_BEGIN(store_db);
+POBJ_LAYOUT_TOID(store_db, struct redis_pmem_root);
+POBJ_LAYOUT_TOID(store_db, struct key_val_pair_PM);
+POBJ_LAYOUT_END(store_db);
+
+#include "pmem.h"
+
+uint64_t pm_type_root_type_id;
+uint64_t pm_type_key_val_pair_PM;
+uint64_t pm_type_sds_type_id;
+uint64_t pm_type_emb_sds_type_id;
+
+/* Type key_val_pair_PM Object */
+#define PM_TYPE_KEY_VAL_PAIR_PM pm_type_key_val_pair_PM
+/* Type SDS Object */
+#define PM_TYPE_SDS pm_type_sds_type_id
+/* Type Embedded SDS Object */
+#define PM_TYPE_EMB_SDS pm_type_emb_sds_type_id
+
+struct redis_pmem_root {
+	uint64_t num_dict_entries;
+	TOID(struct key_val_pair_PM) pe_first;
+};
+
+#endif
+
 typedef long long mstime_t; /* millisecond time type. */
 
 #include "ae.h"      /* Event driven programming library */
@@ -161,6 +194,11 @@ typedef long long mstime_t; /* millisecond time type. */
 #define CONFIG_DEFAULT_DEFRAG_CYCLE_MIN 25 /* 25% CPU min (at lower threshold) */
 #define CONFIG_DEFAULT_DEFRAG_CYCLE_MAX 75 /* 75% CPU max (at upper threshold) */
 #define CONFIG_DEFAULT_PROTO_MAX_BULK_LEN (512ll*1024*1024) /* Bulk request max size */
+
+#ifdef USE_PMDK
+#define CONFIG_MIN_PM_FILE_SIZE PMEMOBJ_MIN_POOL
+#define CONFIG_DEFAULT_PM_FILE_SIZE (1024*1024*1024) /* 1GB */
+#endif
 
 #define ACTIVE_EXPIRE_CYCLE_LOOKUPS_PER_LOOP 20 /* Loopkups per loop. */
 #define ACTIVE_EXPIRE_CYCLE_FAST_DURATION 1000 /* Microseconds */
@@ -989,6 +1027,16 @@ struct redisServer {
     int supervised_mode;            /* See SUPERVISED_* */
     int daemonize;                  /* True if running as a daemon */
     clientBufferLimitsConfig client_obuf_limits[CLIENT_TYPE_OBUF_COUNT];
+#ifdef USE_PMDK
+    /* Persistent memory */
+    char* pm_file_path;             /* Path to persistent memory file */
+    size_t pm_file_size;            /* If PM file does not exist, create new one with given size */
+    bool persistent;                /* Persistence enabled/disabled */
+    bool pm_reconstruct_required; /* reconstruct database form PMEM */
+    PMEMobjpool *pm_pool;           /* PMEM pool handle */
+    TOID(struct redis_pmem_root) pm_rootoid; /*PMEM root object OID*/
+    uint64_t pool_uuid_lo;          /* PMEM pool UUID */
+#endif
     /* AOF persistence */
     int aof_state;                  /* AOF_(ON|OFF|WAIT_REWRITE) */
     int aof_fsync;                  /* Kind of fsync() policy */
@@ -1480,6 +1528,15 @@ int collateStringObjects(robj *a, robj *b);
 int equalStringObjects(robj *a, robj *b);
 unsigned long long estimateObjectIdleTime(robj *o);
 #define sdsEncodedObject(objptr) (objptr->encoding == OBJ_ENCODING_RAW || objptr->encoding == OBJ_ENCODING_EMBSTR)
+
+#ifdef USE_PMDK
+/* Persistent Memory support */
+void decrRefCountPM(robj *o);
+void freeStringObjectPM(robj *o);
+robj *createObjectPM(int type, void *ptr);
+robj *createRawStringObjectPM(const char *ptr, size_t len);
+robj *dupStringObjectPM(robj *o);
+#endif
 
 /* Synchronous I/O with timeout */
 ssize_t syncWrite(int fd, char *ptr, ssize_t size, long long timeout);
