@@ -184,8 +184,8 @@ dictEntry **dictFindEntryRefByPtrAndHash(dict *d, const void *oldptr, uint64_t h
 #ifdef USE_PMDK
 /* PMEM-specific API */
 int dictAddPM(dict *d, void *key, void *val);
-dictEntry *dictAddRawPM(dict *d, void *key);
-dictEntry *dictAddReconstructedPM(dict *d, void *key, void *val);
+dictEntry *dictAddRawPM(dict *d, void *key, dictEntry **existing);
+dictEntry *dictAddReconstructedPM(dict *d, void *key, void *val, dictEntry **existing);
 int dictReplacePM(dict *d, void *key, void *val);
 #endif
 
