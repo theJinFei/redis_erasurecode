@@ -282,7 +282,7 @@ int dictAdd(dict *d, void *key, void *val)
 /* Add an element to the target hash table */
 int dictAddPM(dict *d, void *key, void *val)
 {
-    dictEntry *entry = dictAddRawPM(d,key);
+    dictEntry *entry = dictAddRawPM(d,key,NULL);
 
     if (!entry) return DICT_ERR;
     dictSetVal(d, entry, val);
@@ -353,7 +353,7 @@ dictEntry *dictAddRaw(dict *d, void *key, dictEntry **existing)
  * If key already exists NULL is returned.
  * If key was added, the hash entry is returned to be manipulated by the caller.
  */
-dictEntry *dictAddRawPM(dict *d, void *key)
+dictEntry *dictAddRawPM(dict *d, void *key, dictEntry **existing)
 {
     int index;
     dictEntry *entry;
@@ -363,7 +363,7 @@ dictEntry *dictAddRawPM(dict *d, void *key)
 
     /* Get the index of the new element, or -1 if
      * the element already exists. */
-    if ((index = _dictKeyIndex(d, key)) == -1)
+    if ((index = _dictKeyIndex(d, key, dictHashKey(d,key), existing)) == -1)
         return NULL;
 
     /* Allocate the memory and store the new entry.
@@ -383,7 +383,7 @@ dictEntry *dictAddRawPM(dict *d, void *key)
     return entry;
 }
 
-dictEntry *dictAddReconstructedPM(dict *d, void *key, void *val)
+dictEntry *dictAddReconstructedPM(dict *d, void *key, void *val, dictEntry **existing)
 {
     int index;
     dictEntry *entry;
@@ -394,7 +394,7 @@ dictEntry *dictAddReconstructedPM(dict *d, void *key, void *val)
 
     /* Get the index of the new element, or -1 if
      * the element already exists. */
-    if ((index = _dictKeyIndex(d, (const void *)key)) == -1)
+    if ((index = _dictKeyIndex(d, (const void *)key, dictHashKey(d,key), existing)) == -1)
         return NULL;
 
     /* Allocate the memory and store the new entry.
