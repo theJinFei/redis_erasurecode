@@ -53,7 +53,7 @@ pmemReconstruct(void)
 		key = (void *)(kv_PM->key_oid.off + (uint64_t)pmem_base_addr);
 		val = (void *)(kv_PM->val_oid.off + (uint64_t)pmem_base_addr);
 
-        (void)dictAddReconstructedPM(d, key, val);
+        (void)dictAddReconstructedPM(d, key, val, NULL);
     }
     return C_OK;
 }

@@ -441,7 +441,7 @@ void loadServerConfigFromString(char *config) {
             if (server.hz > CONFIG_MAX_HZ) server.hz = CONFIG_MAX_HZ;
         } 
 #ifdef USE_PMDK
-        } else if (!strcasecmp(argv[0],"pmfile") && (argc == 3)) {
+        else if (!strcasecmp(argv[0],"pmfile") && (argc == 3)) {
             server.pm_file_path = zstrdup(argv[1]);
             long long size = memtoll(argv[2],NULL);
             if (size == 0) {
@@ -453,6 +453,7 @@ void loadServerConfigFromString(char *config) {
                 err = "Invalid pmfile size"; goto loaderr;
             }
             server.pm_file_size = size;
+        }
 #endif
         else if (!strcasecmp(argv[0],"appendonly") && argc == 2) {
             int yes;
