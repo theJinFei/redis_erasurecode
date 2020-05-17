@@ -716,6 +716,8 @@ void signalListAsReady(redisDb *db, robj *key) {
      * to avoid adding it multiple times into a list with a simple O(1)
      * check. */
     incrRefCount(key);
+
+
     serverAssert(dictAdd(db->ready_keys,key,NULL) == DICT_OK);
 }
 

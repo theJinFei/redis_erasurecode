@@ -245,10 +245,22 @@ void dbOverwritePM(redisDb *db, robj *key, robj *val) {
 void setKey(redisDb *db, robj *key, robj *val) {
     if (lookupKeyWrite(db,key) == NULL) {
         dbAdd(db,key,val);
+        //set, diff=val
     } else {
         dbOverwrite(db,key,val);
+        //update, diff=old val ^ new val
     }
     incrRefCount(val);
+
+    
+#ifdef _ERASURE_CODE_
+    /* We also add the key ref */
+    incrCommandCnt(key);
+    /* transfer the (key + robj) to the parity*/
+    
+
+#endif
+
     removeExpire(db,key);
     signalModifiedKey(db,key);
 }

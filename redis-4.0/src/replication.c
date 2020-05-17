@@ -272,6 +272,134 @@ void replicationFeedSlaves(list *slaves, int dictid, robj **argv, int argc) {
     }
 }
 
+
+# ifdef _ERASURE_CODE_
+// 新增传送给校验节点的
+void replicationFeedParity(clusterNode* node, int dictid, robj **argv, int argc) {
+
+    /* redis log*/
+    serverLog(LL_NOTICE,
+            "this is replicationFeedParity",
+                node->name);
+
+
+# ifdef _IS_PARITY_
+    // listNode *ln;
+    // listIter li;
+    // int j, len;
+    // char llstr[LONG_STR_SIZE];
+
+    // /* If the instance is not a top level master, return ASAP: we'll just proxy
+    //  * the stream of data we receive from our master instead, in order to
+    //  * propagate *identical* replication stream. In this way this slave can
+    //  * advertise the same replication ID as the master (since it shares the
+    //  * master replication history and has the same backlog and offsets). */
+    // if (server.masterhost != NULL) return;
+
+    // // 
+    // /* If there aren't slaves, and there is no backlog buffer to populate,
+    //  * we can return ASAP. */
+    // if (server.repl_backlog == NULL && listLength(slaves) == 0) return;
+
+    // /* We can't have slaves attached and no backlog. */
+    // serverAssert(!(listLength(slaves) != 0 && server.repl_backlog == NULL));
+
+    // /* Send SELECT command to every slave if needed. */
+    // // 如果有需要的话，发送 SELECT 命令，指定数据库
+    // if (server.slaveseldb != dictid) {
+    //     robj *selectcmd;
+
+    //     /* For a few DBs we have pre-computed SELECT command. */
+    //     if (dictid >= 0 && dictid < PROTO_SHARED_SELECT_CMDS) {
+    //         selectcmd = shared.select[dictid];
+    //     } else {
+    //         int dictid_len;
+
+    //         dictid_len = ll2string(llstr,sizeof(llstr),dictid);
+    //         selectcmd = createObject(OBJ_STRING,
+    //             sdscatprintf(sdsempty(),
+    //             "*2\r\n$6\r\nSELECT\r\n$%d\r\n%s\r\n",
+    //             dictid_len, llstr));
+    //     }
+
+    //     /* Add the SELECT command into the backlog. */
+    //     // 将 SELECT 命令添加到 backlog
+    //     if (server.repl_backlog) feedReplicationBacklogWithObject(selectcmd);
+
+    //     /* Send it to slaves. */
+    //     // 发送给所有从服务器
+    //     listRewind(slaves,&li);
+    //     while((ln = listNext(&li))) {
+    //         client *slave = ln->value;
+    //         if (slave->replstate == SLAVE_STATE_WAIT_BGSAVE_START) continue;
+    //         addReply(slave,selectcmd);
+    //     }
+
+    //     if (dictid < 0 || dictid >= PROTO_SHARED_SELECT_CMDS)
+    //         decrRefCount(selectcmd);
+    // }
+    // server.slaveseldb = dictid;
+
+    // /* Write the command to the replication backlog if any. */
+    // // 将命令写入到backlog
+    // if (server.repl_backlog) {
+    //     char aux[LONG_STR_SIZE+3];
+
+    //     /* Add the multi bulk reply length. */
+    //     aux[0] = '*';
+    //     len = ll2string(aux+1,sizeof(aux)-1,argc);
+    //     aux[len+1] = '\r';
+    //     aux[len+2] = '\n';
+    //     feedReplicationBacklog(aux,len+3);
+
+    //     for (j = 0; j < argc; j++) {
+    //         long objlen = stringObjectLen(argv[j]);
+
+    //         /* We need to feed the buffer with the object as a bulk reply
+    //          * not just as a plain string, so create the $..CRLF payload len
+    //          * and add the final CRLF */
+    //         // 将参数从对象转换成协议格式
+    //         aux[0] = '$';
+    //         len = ll2string(aux+1,sizeof(aux)-1,objlen);
+    //         aux[len+1] = '\r';
+    //         aux[len+2] = '\n';
+    //         feedReplicationBacklog(aux,len+3);
+    //         feedReplicationBacklogWithObject(argv[j]);
+    //         feedReplicationBacklog(aux+len+1,2);
+    //     }
+    // }
+
+    // /* Write the command to every slave. */
+    // listRewind(slaves,&li);
+    // while((ln = listNext(&li))) {
+
+    //     // 指向从服务器
+    //     client *slave = ln->value;
+
+    //     /* Don't feed slaves that are still waiting for BGSAVE to start */
+    //     // 不要给正在等待 BGSAVE 开始的从服务器发送命令
+    //     if (slave->replstate == SLAVE_STATE_WAIT_BGSAVE_START) continue;
+
+    //     /* Feed slaves that are waiting for the initial SYNC (so these commands
+    //      * are queued in the output buffer until the initial SYNC completes),
+    //      * or are already in sync with the master. */
+    //     // 向已经接收完和正在接收 RDB 文件的从服务器发送命令
+    //     // 如果从服务器正在接收主服务器发送的 RDB 文件，
+    //     // 那么在初次 SYNC 完成之前，主服务器发送的内容会被放进一个缓冲区里面
+
+    //     /* Add the multi bulk length. */
+    //     addReplyMultiBulkLen(slave,argc);
+
+    //     /* Finally any additional argument that was not stored inside the
+    //      * static buffer if any (from j to argc). */
+    //     for (j = 0; j < argc; j++)
+    //         addReplyBulk(slave,argv[j]);
+    // }
+    # endif
+}
+# endif
+
+
 /* This function is used in order to proxy what we receive from our master
  * to our sub-slaves. */
 #include <ctype.h>
@@ -1954,6 +2082,7 @@ void replicationSetMaster(char *ip, int port) {
     /* Before destroying our master state, create a cached master using
      * our own parameters, to later PSYNC with the new master. */
     if (was_master) replicationCacheMasterUsingMyself();
+    // 进入连接状态
     server.repl_state = REPL_STATE_CONNECT;
 }
 
@@ -2004,6 +2133,7 @@ void replicationHandleMasterDisconnection(void) {
 void slaveofCommand(client *c) {
     /* SLAVEOF is not allowed in cluster mode as replication is automatically
      * configured using the current address of the master node. */
+    // 不允许在集群模式中使用
     if (server.cluster_enabled) {
         addReplyError(c,"SLAVEOF not allowed in cluster mode.");
         return;
@@ -2011,6 +2141,7 @@ void slaveofCommand(client *c) {
 
     /* The special host/port combination "NO" "ONE" turns the instance
      * into a master. Otherwise the new master address is set. */
+    // SLAVEOF NO ONE 关闭复制功能，让从服务器转为主服务器
     if (!strcasecmp(c->argv[1]->ptr,"no") &&
         !strcasecmp(c->argv[2]->ptr,"one")) {
         if (server.masterhost) {
@@ -2044,7 +2175,10 @@ void slaveofCommand(client *c) {
         }
         /* There was no previous master or the user specified a different one,
          * we can continue. */
+        // 第一次执行设置端口和ip，或者是重新设置端口和IP
+        // 设置服务器复制操作的主节点IP和端口
         replicationSetMaster(c->argv[1]->ptr, port);
+        // 获取client的每种信息，并以sds形式返回，并打印到日志中
         sds client = catClientInfoString(sdsempty(),c);
         serverLog(LL_NOTICE,"SLAVE OF %s:%d enabled (user request from '%s')",
             server.masterhost, server.masterport, client);

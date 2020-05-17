@@ -200,6 +200,10 @@ typedef long long mstime_t; /* millisecond time type. */
 #define CONFIG_DEFAULT_PM_FILE_SIZE (1024*1024*1024) /* 1GB */
 #endif
 
+#ifndef _ERASURE_CODE_
+#define _ERASURE_CODE_
+#endif
+
 #define ACTIVE_EXPIRE_CYCLE_LOOKUPS_PER_LOOP 20 /* Loopkups per loop. */
 #define ACTIVE_EXPIRE_CYCLE_FAST_DURATION 1000 /* Microseconds */
 #define ACTIVE_EXPIRE_CYCLE_SLOW_TIME_PERC 25 /* CPU max % for keys collection */
@@ -628,6 +632,11 @@ typedef struct redisObject {
                             * and most significant 16 bits access time). */
     int refcount;
     void *ptr;
+
+    // #ifdef _ERASURE_CODE_
+    //     int cnt = 0;
+    //     int flag = 0;
+    // #endif
 } robj;
 
 /* Macro used to initialize a Redis object allocated on the stack.
@@ -1037,6 +1046,10 @@ struct redisServer {
     TOID(struct redis_pmem_root) pm_rootoid; /*PMEM root object OID*/
     uint64_t pool_uuid_lo;          /* PMEM pool UUID */
 #endif
+// #ifdef _ERASURE_CODE_
+//     int numCommand = 0;     // global command id
+// #endif
+
     /* AOF persistence */
     int aof_state;                  /* AOF_(ON|OFF|WAIT_REWRITE) */
     int aof_fsync;                  /* Kind of fsync() policy */
@@ -1531,6 +1544,7 @@ unsigned long long estimateObjectIdleTime(robj *o);
 
 #ifdef USE_PMDK
 /* Persistent Memory support */
+void dbAddPM(redisDb *db, robj *key, robj *val);
 void decrRefCountPM(robj *o);
 void freeStringObjectPM(robj *o);
 robj *createObjectPM(int type, void *ptr);

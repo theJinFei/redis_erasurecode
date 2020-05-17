@@ -1636,8 +1636,16 @@ int rdbLoadRio(rio *rdb, rdbSaveInfo *rsi, int loading_aof) {
             decrRefCount(val);
             continue;
         }
+
+        
+
+        /* Add the new object in the PM hash table */
+        #ifdef USE_PMDK
+        dbAddPM(db,key,val);
+        #else
         /* Add the new object in the hash table */
         dbAdd(db,key,val);
+        #endif
 
         /* Set the expire time if needed */
         if (expiretime != -1) setExpire(NULL,db,key,expiretime);

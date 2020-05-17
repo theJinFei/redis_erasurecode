@@ -1305,7 +1305,7 @@ int processMultibulkBuffer(client *c) {
                 pos = 0;
             } else {
                 c->argv[c->argc++] =
-                    createStringObject(c->querybuf+pos,c->bulklen);
+                    createStringObject(c->querybuf+pos,c->bulklen); // 填充object命令
                 pos += c->bulklen+2;
             }
             c->bulklen = -1;
@@ -1360,6 +1360,20 @@ void processInputBuffer(client *c) {
         } else {
             serverPanic("Unknown request type");
         }
+
+# ifdef _ERASURE_COCE
+        // 这个时候 其实命令就已经解析出来了
+        // 如果解析的命令中包含的flag是parity定义的类型的话
+        // 进行命令解析
+        // 不等于normal 就直接跳转 走parity的几个函数即可
+        if(c -> argc[] -> argv != normal){
+            switch():
+            case :
+            // 传播命令
+
+            return;
+        }
+# endif
 
         /* Multibulk processing could see a <= 0 length. */
         if (c->argc == 0) {

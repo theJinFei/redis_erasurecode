@@ -399,6 +399,12 @@ void incrRefCount(robj *o) {
     if (o->refcount != OBJ_SHARED_REFCOUNT) o->refcount++;
 }
 
+#ifdef _ERASURE_CODE_
+void incrCommandCnt(robj *o) {
+    o -> cnt = server.command++;
+}
+#endif
+
 void decrRefCount(robj *o) {
     if (o->refcount == 1) {
         switch(o->type) {

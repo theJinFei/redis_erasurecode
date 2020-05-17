@@ -110,6 +110,9 @@ void setGenericCommand(client *c, int flags, robj *key, robj *val, robj *expire,
 #else
     setKey(c->db,key,val);
 #endif
+
+
+    
     server.dirty++;
     if (expire) setExpire(c,c->db,key,mstime()+milliseconds);
     notifyKeyspaceEvent(NOTIFY_STRING,"set",key,c->db->id);

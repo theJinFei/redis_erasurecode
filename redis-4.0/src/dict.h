@@ -53,6 +53,10 @@ typedef struct dictEntry {
         double d;
     } v;
     struct dictEntry *next;
+#ifdef _ERASUER_CODE_
+    int cntCommand;
+#endif
+
 } dictEntry;
 
 typedef struct dictType {

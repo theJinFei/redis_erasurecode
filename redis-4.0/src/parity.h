@@ -27,21 +27,21 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __PMEM_H
-#define __PMEM_H
+#ifndef __PARITY_H
+#define __PARITY_H
 
-#ifdef USE_PMDK
-typedef struct key_val_pair_PM {
-    PMEMoid key_oid;
-    PMEMoid val_oid;
-    TOID(struct key_val_pair_PM) pmem_list_next;
-    TOID(struct key_val_pair_PM) pmem_list_prev;
-} key_val_pair_PM;
+# ifdef _ERASURE_CODE_
 
-int pmemReconstruct(void);
-void pmemKVpairSet(void *key, void *val);
-PMEMoid pmemAddToPmemList(void *key, void *val);
-void pmemRemoveFromPmemList(PMEMoid kv_PM_oid);
-#endif
+// ENCODE
+# define PARITY_READ_BUFFER_AND_ENCODE 0   // 编码过程
 
+// DECODE
+# define PARITY_NOTIFY_DATANODE 1   // 校验节点 通知其他数据节点 启动恢复
+# define DATANODE_TRANSFORM_DATA 2  // 数据节点 收到这个标志 表示要传输特定位置的数据
+# define PARIYT_READ_BUFFER_AND_DECODE 3 // 校验节点 收到标志 表示读缓冲区 进行解码
+
+// 传输给故障节点
+# define TRANFORM_GOOD_DATA 4   // 校验节点传输恢复好的数据 然后故障节点进行重新读缓冲区即可
+
+# endif
 #endif
