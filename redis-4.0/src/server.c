@@ -34,6 +34,11 @@
 #include "latency.h"
 #include "atomicvar.h"
 
+#ifdef _ERASURE_CODE_
+#include "replication.h"
+#include "parity.h"
+#endif
+
 #include <time.h>
 #include <signal.h>
 #include <sys/wait.h>
@@ -2176,35 +2181,21 @@ void propagate(struct redisCommand *cmd, int dbid, robj **argv, int argc,
     if (flags & PROPAGATE_REPL)
         replicationFeedSlaves(server.slaves,dbid,argv,argc);
 
-    # ifdef _ERASURE_CODE_
+# ifdef _ERASURE_CODE_
 
     // 如果命令解析正常 在命令执行完
     // 发送给校验节点
-    // if (flags & PROPAGATE_REPL)
-    struct clusterState *cs = server.cluster;  // 找到name -> clusterNodes
-    dictIterator *di;
-    dictEntry *de;
-    const char* targetip = "127.0.0.1";    // 指定一个ip和端口 然后去查找那个node
+    const char* ip = "127.0.0.1";    // 指定一个ip和端口 然后去查找那个node
     const uint16_t port = 7003;
     const uint16_t cport = port + CLUSTER_PORT_INCR;;
-    di = dictGetSafeIterator(cs -> nodes);
-    clusterNode *node;
-    while((de = dictNext(di)) != NULL) {
-        node = dictGetVal(de);
-
-        // if (!nodeInHandshake(node)) continue;
-        if (!strcasecmp(node->ip,ip) &&
-            node->port == port &&
-            node->cport == cport) break;
-    }
-    dictReleaseIterator(di);
+    clusterNode* node = getNodeByDict(ip, port, cport);
     if(node != NULL){
         replicationFeedParity(node,dbid,argv,argc);
     }else{
         /* redis log*/
         serverLog(LL_NOTICE,"this is prropagate and node is null");
     }
-    # endif
+ # endif
 
 }
 

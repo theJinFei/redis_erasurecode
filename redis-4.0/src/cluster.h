@@ -270,4 +270,9 @@ clusterNode *getNodeByQuery(client *c, struct redisCommand *cmd, robj **argv, in
 int clusterRedirectBlockedClientIfNeeded(client *c);
 void clusterRedirectClient(client *c, clusterNode *n, int hashslot, int error_code);
 
+
+# ifdef _ERASURE_CODE_
+clusterNode* getNodeByDict(const char* ip, const uint16_t port, const uint16_t cport);
+# endif
+
 #endif /* __CLUSTER_H */

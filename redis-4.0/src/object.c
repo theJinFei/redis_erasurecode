@@ -38,6 +38,10 @@
 #include "libpmem.h"
 #endif
 
+#ifdef _ERASURE_CODE_
+#include "parity.h"
+#endif
+
 #ifdef __CYGWIN__
 #define strtold(a,b) ((long double)strtod((a),(b)))
 #endif
@@ -50,6 +54,10 @@ robj *createObject(int type, void *ptr) {
     o->encoding = OBJ_ENCODING_RAW;
     o->ptr = ptr;
     o->refcount = 1;
+
+# ifdef _ERASURE_CODE_
+    o -> flag = PARITY_NORMAL_PROCESS;
+# endif
 
     /* Set the LRU to the current lruclock (minutes resolution), or
      * alternatively the LFU counter. */
@@ -399,11 +407,11 @@ void incrRefCount(robj *o) {
     if (o->refcount != OBJ_SHARED_REFCOUNT) o->refcount++;
 }
 
-#ifdef _ERASURE_CODE_
-void incrCommandCnt(robj *o) {
-    o -> cnt = server.command++;
-}
-#endif
+// #ifdef _ERASURE_CODE_
+// void incrCommandCnt(robj *o) {
+//     o -> cnt = server.command++;
+// }
+// #endif
 
 void decrRefCount(robj *o) {
     if (o->refcount == 1) {

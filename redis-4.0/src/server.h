@@ -49,6 +49,10 @@
 #include <lua.h>
 #include <signal.h>
 
+#ifdef _ERASURE_CODE_
+#include "cluster.h"
+#endif
+
 #ifdef USE_PMDK
 #include <stdbool.h>
 #include <sys/queue.h>
@@ -633,10 +637,10 @@ typedef struct redisObject {
     int refcount;
     void *ptr;
 
-    // #ifdef _ERASURE_CODE_
-    //     int cnt = 0;
-    //     int flag = 0;
-    // #endif
+    #ifdef _ERASURE_CODE_
+        // int cnt = 0;
+        unsigned int flag;
+    #endif
 } robj;
 
 /* Macro used to initialize a Redis object allocated on the stack.

@@ -5446,6 +5446,29 @@ clusterNode *getNodeByQuery(client *c, struct redisCommand *cmd, robj **argv, in
     return n;
 }
 
+// 找到校验节点
+clusterNode *getNodeByDict(const char* ip, const uint16_t port, const uint16_t cport) {
+    // 在根据Ip字典中查找对应的发送的node
+    // if (flags & PROPAGATE_REPL)
+    struct clusterState *cs = server.cluster;  // 找到name -> clusterNodes
+    dictIterator *di;
+    dictEntry *de;
+
+    di = dictGetSafeIterator(cs -> nodes);
+    clusterNode *node;
+    while((de = dictNext(di)) != NULL) {
+        node = dictGetVal(de);
+
+        // if (!nodeInHandshake(node)) continue;
+        if (!strcasecmp(node->ip,ip) &&
+            node->port == port &&
+            node->cport == cport) break;
+    }
+    dictReleaseIterator(di);
+    return node;
+}
+
+
 /* Send the client the right redirection code, according to error_code
  * that should be set to one of CLUSTER_REDIR_* macros.
  *

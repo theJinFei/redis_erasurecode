@@ -30,6 +30,12 @@
 
 
 #include "server.h"
+#include "cluster.h"
+
+
+#ifdef _ERASURE_CODE_
+#include "replication.h"
+#endif
 
 #include <sys/time.h>
 #include <unistd.h>
@@ -276,125 +282,136 @@ void replicationFeedSlaves(list *slaves, int dictid, robj **argv, int argc) {
 # ifdef _ERASURE_CODE_
 // 新增传送给校验节点的
 void replicationFeedParity(clusterNode* node, int dictid, robj **argv, int argc) {
+    int j;
+    for (j = 1; j < argc; j++) {
+        robj* o = getDecodedObject(argv[j]);
+        /* redis log*/
+        serverLog(LL_NOTICE, "this is robj and the command of split is %s", (char*)o -> ptr);
+    }
 
     /* redis log*/
-    serverLog(LL_NOTICE,
-            "this is replicationFeedParity",
-                node->name);
+    serverLog(LL_NOTICE, "this is replicationFeedParity and the node name is %s",(char*)node->name);
 
-
+// 发给校验节点
 # ifdef _IS_PARITY_
-    // listNode *ln;
-    // listIter li;
-    // int j, len;
-    // char llstr[LONG_STR_SIZE];
 
-    // /* If the instance is not a top level master, return ASAP: we'll just proxy
-    //  * the stream of data we receive from our master instead, in order to
-    //  * propagate *identical* replication stream. In this way this slave can
-    //  * advertise the same replication ID as the master (since it shares the
-    //  * master replication history and has the same backlog and offsets). */
-    // if (server.masterhost != NULL) return;
+    // client 对象
+    /* Finally any additional argument that was not stored inside the
+         * static buffer if any (from j to argc). */
+    for (j = 0; j < argc; j++)
+        addReplyBulk(slave,argv[j]);
 
-    // // 
-    // /* If there aren't slaves, and there is no backlog buffer to populate,
-    //  * we can return ASAP. */
-    // if (server.repl_backlog == NULL && listLength(slaves) == 0) return;
+    listNode *ln;
+    listIter li;
+    int j, len;
+    char llstr[LONG_STR_SIZE];
 
-    // /* We can't have slaves attached and no backlog. */
-    // serverAssert(!(listLength(slaves) != 0 && server.repl_backlog == NULL));
+    /* If the instance is not a top level master, return ASAP: we'll just proxy
+     * the stream of data we receive from our master instead, in order to
+     * propagate *identical* replication stream. In this way this slave can
+     * advertise the same replication ID as the master (since it shares the
+     * master replication history and has the same backlog and offsets). */
+    if (server.masterhost != NULL) return;
 
-    // /* Send SELECT command to every slave if needed. */
-    // // 如果有需要的话，发送 SELECT 命令，指定数据库
-    // if (server.slaveseldb != dictid) {
-    //     robj *selectcmd;
+    // 
+    /* If there aren't slaves, and there is no backlog buffer to populate,
+     * we can return ASAP. */
+    if (server.repl_backlog == NULL && listLength(slaves) == 0) return;
 
-    //     /* For a few DBs we have pre-computed SELECT command. */
-    //     if (dictid >= 0 && dictid < PROTO_SHARED_SELECT_CMDS) {
-    //         selectcmd = shared.select[dictid];
-    //     } else {
-    //         int dictid_len;
+    /* We can't have slaves attached and no backlog. */
+    serverAssert(!(listLength(slaves) != 0 && server.repl_backlog == NULL));
 
-    //         dictid_len = ll2string(llstr,sizeof(llstr),dictid);
-    //         selectcmd = createObject(OBJ_STRING,
-    //             sdscatprintf(sdsempty(),
-    //             "*2\r\n$6\r\nSELECT\r\n$%d\r\n%s\r\n",
-    //             dictid_len, llstr));
-    //     }
+    /* Send SELECT command to every slave if needed. */
+    // 如果有需要的话，发送 SELECT 命令，指定数据库
+    if (server.slaveseldb != dictid) {
+        robj *selectcmd;
 
-    //     /* Add the SELECT command into the backlog. */
-    //     // 将 SELECT 命令添加到 backlog
-    //     if (server.repl_backlog) feedReplicationBacklogWithObject(selectcmd);
+        /* For a few DBs we have pre-computed SELECT command. */
+        if (dictid >= 0 && dictid < PROTO_SHARED_SELECT_CMDS) {
+            selectcmd = shared.select[dictid];
+        } else {
+            int dictid_len;
 
-    //     /* Send it to slaves. */
-    //     // 发送给所有从服务器
-    //     listRewind(slaves,&li);
-    //     while((ln = listNext(&li))) {
-    //         client *slave = ln->value;
-    //         if (slave->replstate == SLAVE_STATE_WAIT_BGSAVE_START) continue;
-    //         addReply(slave,selectcmd);
-    //     }
+            dictid_len = ll2string(llstr,sizeof(llstr),dictid);
+            selectcmd = createObject(OBJ_STRING,
+                sdscatprintf(sdsempty(),
+                "*2\r\n$6\r\nSELECT\r\n$%d\r\n%s\r\n",
+                dictid_len, llstr));
+        }
 
-    //     if (dictid < 0 || dictid >= PROTO_SHARED_SELECT_CMDS)
-    //         decrRefCount(selectcmd);
-    // }
-    // server.slaveseldb = dictid;
+        /* Add the SELECT command into the backlog. */
+        // 将 SELECT 命令添加到 backlog
+        if (server.repl_backlog) feedReplicationBacklogWithObject(selectcmd);
 
-    // /* Write the command to the replication backlog if any. */
-    // // 将命令写入到backlog
-    // if (server.repl_backlog) {
-    //     char aux[LONG_STR_SIZE+3];
+        /* Send it to slaves. */
+        // 发送给所有从服务器
+        listRewind(slaves,&li);
+        while((ln = listNext(&li))) {
+            client *slave = ln->value;
+            if (slave->replstate == SLAVE_STATE_WAIT_BGSAVE_START) continue;
+            addReply(slave,selectcmd);
+        }
 
-    //     /* Add the multi bulk reply length. */
-    //     aux[0] = '*';
-    //     len = ll2string(aux+1,sizeof(aux)-1,argc);
-    //     aux[len+1] = '\r';
-    //     aux[len+2] = '\n';
-    //     feedReplicationBacklog(aux,len+3);
+        if (dictid < 0 || dictid >= PROTO_SHARED_SELECT_CMDS)
+            decrRefCount(selectcmd);
+    }
+    server.slaveseldb = dictid;
 
-    //     for (j = 0; j < argc; j++) {
-    //         long objlen = stringObjectLen(argv[j]);
+    /* Write the command to the replication backlog if any. */
+    // 将命令写入到backlog
+    if (server.repl_backlog) {
+        char aux[LONG_STR_SIZE+3];
 
-    //         /* We need to feed the buffer with the object as a bulk reply
-    //          * not just as a plain string, so create the $..CRLF payload len
-    //          * and add the final CRLF */
-    //         // 将参数从对象转换成协议格式
-    //         aux[0] = '$';
-    //         len = ll2string(aux+1,sizeof(aux)-1,objlen);
-    //         aux[len+1] = '\r';
-    //         aux[len+2] = '\n';
-    //         feedReplicationBacklog(aux,len+3);
-    //         feedReplicationBacklogWithObject(argv[j]);
-    //         feedReplicationBacklog(aux+len+1,2);
-    //     }
-    // }
+        /* Add the multi bulk reply length. */
+        aux[0] = '*';
+        len = ll2string(aux+1,sizeof(aux)-1,argc);
+        aux[len+1] = '\r';
+        aux[len+2] = '\n';
+        feedReplicationBacklog(aux,len+3);
 
-    // /* Write the command to every slave. */
-    // listRewind(slaves,&li);
-    // while((ln = listNext(&li))) {
+        for (j = 0; j < argc; j++) {
+            long objlen = stringObjectLen(argv[j]);
 
-    //     // 指向从服务器
-    //     client *slave = ln->value;
+            /* We need to feed the buffer with the object as a bulk reply
+             * not just as a plain string, so create the $..CRLF payload len
+             * and add the final CRLF */
+            // 将参数从对象转换成协议格式
+            aux[0] = '$';
+            len = ll2string(aux+1,sizeof(aux)-1,objlen);
+            aux[len+1] = '\r';
+            aux[len+2] = '\n';
+            feedReplicationBacklog(aux,len+3);
+            feedReplicationBacklogWithObject(argv[j]);
+            feedReplicationBacklog(aux+len+1,2);
+        }
+    }
 
-    //     /* Don't feed slaves that are still waiting for BGSAVE to start */
-    //     // 不要给正在等待 BGSAVE 开始的从服务器发送命令
-    //     if (slave->replstate == SLAVE_STATE_WAIT_BGSAVE_START) continue;
+    /* Write the command to every slave. */
+    listRewind(slaves,&li);
+    while((ln = listNext(&li))) {
 
-    //     /* Feed slaves that are waiting for the initial SYNC (so these commands
-    //      * are queued in the output buffer until the initial SYNC completes),
-    //      * or are already in sync with the master. */
-    //     // 向已经接收完和正在接收 RDB 文件的从服务器发送命令
-    //     // 如果从服务器正在接收主服务器发送的 RDB 文件，
-    //     // 那么在初次 SYNC 完成之前，主服务器发送的内容会被放进一个缓冲区里面
+        // 指向从服务器
+        client *slave = ln->value;
 
-    //     /* Add the multi bulk length. */
-    //     addReplyMultiBulkLen(slave,argc);
+        /* Don't feed slaves that are still waiting for BGSAVE to start */
+        // 不要给正在等待 BGSAVE 开始的从服务器发送命令
+        if (slave->replstate == SLAVE_STATE_WAIT_BGSAVE_START) continue;
 
-    //     /* Finally any additional argument that was not stored inside the
-    //      * static buffer if any (from j to argc). */
-    //     for (j = 0; j < argc; j++)
-    //         addReplyBulk(slave,argv[j]);
-    // }
+        /* Feed slaves that are waiting for the initial SYNC (so these commands
+         * are queued in the output buffer until the initial SYNC completes),
+         * or are already in sync with the master. */
+        // 向已经接收完和正在接收 RDB 文件的从服务器发送命令
+        // 如果从服务器正在接收主服务器发送的 RDB 文件，
+        // 那么在初次 SYNC 完成之前，主服务器发送的内容会被放进一个缓冲区里面
+
+        /* Add the multi bulk length. */
+        addReplyMultiBulkLen(slave,argc);
+
+        /* Finally any additional argument that was not stored inside the
+         * static buffer if any (from j to argc). */
+        for (j = 0; j < argc; j++)
+            addReplyBulk(slave,argv[j]);
+    }
     # endif
 }
 # endif

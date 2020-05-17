@@ -253,13 +253,12 @@ void setKey(redisDb *db, robj *key, robj *val) {
     incrRefCount(val);
 
     
-#ifdef _ERASURE_CODE_
-    /* We also add the key ref */
-    incrCommandCnt(key);
-    /* transfer the (key + robj) to the parity*/
-    
+// #ifdef _ERASURE_CODE_
+//     /* We also add the key ref */
+//     incrCommandCnt(key);
+//     /* transfer the (key + robj) to the parity*/
 
-#endif
+// #endif
 
     removeExpire(db,key);
     signalModifiedKey(db,key);

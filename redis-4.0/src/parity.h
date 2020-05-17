@@ -30,18 +30,22 @@
 #ifndef __PARITY_H
 #define __PARITY_H
 
+#include "server.h"
+
 # ifdef _ERASURE_CODE_
 
+# define PARITY_NORMAL_PROCESS 0   // 正常过程
+
 // ENCODE
-# define PARITY_READ_BUFFER_AND_ENCODE 0   // 编码过程
+# define PARITY_READ_BUFFER_AND_ENCODE 1   // 编码过程
 
 // DECODE
-# define PARITY_NOTIFY_DATANODE 1   // 校验节点 通知其他数据节点 启动恢复
-# define DATANODE_TRANSFORM_DATA 2  // 数据节点 收到这个标志 表示要传输特定位置的数据
-# define PARIYT_READ_BUFFER_AND_DECODE 3 // 校验节点 收到标志 表示读缓冲区 进行解码
+# define PARITY_NOTIFY_DATANODE 2   // 校验节点 通知其他数据节点 启动恢复
+# define PARIYT_DATANODE_TRANSFORM_DATA 3  // 数据节点 收到这个标志 表示要传输特定位置的数据
+# define PARIYT_READ_BUFFER_AND_DECODE 4 // 校验节点 收到标志 表示读缓冲区 进行解码
 
 // 传输给故障节点
-# define TRANFORM_GOOD_DATA 4   // 校验节点传输恢复好的数据 然后故障节点进行重新读缓冲区即可
+# define PARITY_TRANFORM_GOOD_DATA 5   // 校验节点传输恢复好的数据 然后故障节点进行重新读缓冲区即可
 
 # endif
 #endif

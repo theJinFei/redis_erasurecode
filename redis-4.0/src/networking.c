@@ -1361,18 +1361,31 @@ void processInputBuffer(client *c) {
             serverPanic("Unknown request type");
         }
 
-# ifdef _ERASURE_COCE
+# ifdef _ERASURE_CODE_
+#include "parity.h"
+
         // 这个时候 其实命令就已经解析出来了
         // 如果解析的命令中包含的flag是parity定义的类型的话
         // 进行命令解析
         // 不等于normal 就直接跳转 走parity的几个函数即可
-        if(c -> argc[] -> argv != normal){
-            switch():
-            case :
-            // 传播命令
+        // int j;
+        // for (j = 0; j < c -> argc; j++) {
+            robj* o = getDecodedObject(c -> argv[0]);
+            switch(o -> flag){
+                case PARITY_NORMAL_PROCESS: 
+                    // donothing;
+                case PARITY_READ_BUFFER_AND_ENCODE: 
+                
+                    break;
+                case PARITY_NOTIFY_DATANODE: 
+                
+                    break;
+                default :
+                    serverLog(LL_NOTICE,"this is networking's default");
+            }
+        // }
 
-            return;
-        }
+
 # endif
 
         /* Multibulk processing could see a <= 0 length. */
