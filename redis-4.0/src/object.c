@@ -59,6 +59,7 @@ robj *createObject(int type, void *ptr) {
     o -> flag = PARITY_NORMAL_PROCESS;
 # endif
 
+
     /* Set the LRU to the current lruclock (minutes resolution), or
      * alternatively the LFU counter. */
     if (server.maxmemory_policy & MAXMEMORY_FLAG_LFU) {
@@ -142,6 +143,10 @@ robj *createEmbeddedStringObject(const char *ptr, size_t len) {
     } else {
         memset(sh->buf,0,len+1);
     }
+
+    # ifdef _ERASURE_CODE_
+        o -> flag = PARITY_NORMAL_PROCESS;
+    # endif
     return o;
 }
 

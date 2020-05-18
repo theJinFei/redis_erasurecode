@@ -779,6 +779,10 @@ typedef struct client {
     /* Response buffer */
     int bufpos;
     char buf[PROTO_REPLY_CHUNK_BYTES];
+
+    #ifdef _ERASURE_CODE_
+    listNode *paritys_list_node; /* list node in client list */
+    #endif
 } client;
 
 struct saveparam {
@@ -965,6 +969,9 @@ struct redisServer {
     int cfd[CONFIG_BINDADDR_MAX];/* Cluster bus listening socket */
     int cfd_count;              /* Used slots in cfd[] */
     list *clients;              /* List of active clients */
+#ifdef _ERASURE_CODE_
+    list* paritys;
+#endif
     list *clients_to_close;     /* Clients to close asynchronously */
     list *clients_pending_write; /* There is to write or install handler. */
     list *slaves, *monitors;    /* List of slaves and MONITORs */

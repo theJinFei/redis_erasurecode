@@ -273,13 +273,17 @@ void replicationFeedSlaves(list *slaves, int dictid, robj **argv, int argc) {
 
         /* Finally any additional argument that was not stored inside the
          * static buffer if any (from j to argc). */
-        for (j = 0; j < argc; j++)
+        for (j = 0; j < argc; j++){
             addReplyBulk(slave,argv[j]);
+            // serverLog(LL_NOTICE, "the robj has sended, the obj is %s, and the len is %d", (char*)argv[j] -> ptr, (size_t)strlen((char*)argv[j] -> ptr));
+        }
+            
     }
 }
 
 
 # ifdef _ERASURE_CODE_
+#include "parity.h"
 // 新增传送给校验节点的
 void replicationFeedParity(clusterNode* node, int dictid, robj **argv, int argc) {
     int j;
@@ -289,8 +293,61 @@ void replicationFeedParity(clusterNode* node, int dictid, robj **argv, int argc)
         serverLog(LL_NOTICE, "this is robj and the command of split is %s", (char*)o -> ptr);
     }
 
+    client* c = createClient(-1);;
+    c -> slave_listening_port = node -> port;
+    strcpy(c -> slave_ip, node -> ip);
+    // c -> slave_ip = node -> ip;
+    for (j = 1; j < argc; j++){ // 不需要发送set 这个obj
+        argv[j] -> flag = PARITY_READ_BUFFER_AND_ENCODE;
+        // addReplyString(c, (char*)argv[j] -> ptr, strlen((char*)argv[j] -> ptr));
+        addReplyBulk(c, argv[j]);
+        // serverLog(LL_NOTICE, "the robj has sended, the obj is %s", (char*)argv[j] -> ptr);
+    }  
+
     /* redis log*/
     serverLog(LL_NOTICE, "this is replicationFeedParity and the node name is %s",(char*)node->name);
+
+#ifdef _ERASURE_CODE_
+
+    // client 对象 需要创建是哪个服务器的客户端吗
+    // 需要先找到master的文件描述符
+    // 其他master也是一个客户端？
+    // 客户端链接生成一个fd
+    // 可能会有多个校验节点
+    // server.paritys = listCreate();
+    // client* c = createClient(-1);
+    // c->slave_listening_port = 7002;
+    // strcpy(c -> slave_ip, "127.0.0.1");
+    // listAddNodeHead(server.paritys, c);
+
+    // listIter li;
+    // listNode *ln;
+    // // int processed = listLength(server.paritys);
+
+    // listRewind(server.paritys,&li);
+    // while((ln = listNext(&li))) {
+    //     client *c = listNodeValue(ln);  
+    //     serverLog(LL_NOTICE, "the client c -> name is %s", (char*)c -> name);   // null
+    // }
+    // for (j = 1; j < argc; j++){ // 不需要发送set 这个obj
+    //      // addReplyString(c, (char*)argv[j] -> ptr, strlen((char*)argv[j] -> ptr));
+    //      addReplyBulk(c, argv[j]);
+    //      // serverLog(LL_NOTICE, "the robj has sended, the obj is %s", (char*)argv[j] -> ptr);
+    // }  
+
+    // client* c = createClient();   // 创建一个伪客户端
+    // c->slave_listening_port = 7002;
+    // strcpy(c -> slave_ip, "127.0.0.1");
+
+    // /* Finally any additional argument that was not stored inside the
+    //      * static buffer if any (from j to argc). */
+    // for (j = 0; j < argc; j++){
+    //      addReplyString(c, (char*)argv[j] -> ptr, strlen((char*)argv[j] -> ptr));
+    //      serverLog(LL_NOTICE, "the robj has sended, the obj is %s, and the len is %d", (char*)argv[j] -> ptr, (int)strlen((char*)argv[j] -> ptr));
+    // }  // 不需要发送set 这个obj
+    // addReplyBulk(c,argv[j]);
+
+# endif
 
 // 发给校验节点
 # ifdef _IS_PARITY_

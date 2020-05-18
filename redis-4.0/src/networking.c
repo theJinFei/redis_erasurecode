@@ -77,6 +77,18 @@ void linkClient(client *c) {
     c->client_list_node = listLast(server.clients);
 }
 
+# ifdef _ERASURE_CODE_
+/* This function links the client to the global linked list of clients.
+ * unlinkClient() does the opposite, among other things. */
+void linkParity(client *c) {
+    listAddNodeTail(server.paritys,c);
+    /* Note that we remember the linked list node where the client is stored,
+     * this way removing the client in unlinkClient() will not require
+     * a linear scan, but just a constant time operation. */
+    c->paritys_list_node = listLast(server.paritys);
+}
+# endif
+
 client *createClient(int fd) {
     client *c = zmalloc(sizeof(client));
 
@@ -1363,29 +1375,26 @@ void processInputBuffer(client *c) {
 
 # ifdef _ERASURE_CODE_
 #include "parity.h"
-
         // 这个时候 其实命令就已经解析出来了
         // 如果解析的命令中包含的flag是parity定义的类型的话
         // 进行命令解析
         // 不等于normal 就直接跳转 走parity的几个函数即可
-        // int j;
-        // for (j = 0; j < c -> argc; j++) {
-            robj* o = getDecodedObject(c -> argv[0]);
-            switch(o -> flag){
-                case PARITY_NORMAL_PROCESS: 
-                    // donothing;
-                case PARITY_READ_BUFFER_AND_ENCODE: 
-                
-                    break;
-                case PARITY_NOTIFY_DATANODE: 
-                
-                    break;
-                default :
-                    serverLog(LL_NOTICE,"this is networking's default");
-            }
-        // }
+        robj* o = getDecodedObject(c -> argv[0]);
+        switch(o -> flag){
+            case PARITY_NORMAL_PROCESS: 
+                // donothing;
+                serverLog(LL_NOTICE,"this is networking's PARITY_NORMAL_PROCESS, and the o -> flag is %d", o -> flag);
+                break;
+            case PARITY_READ_BUFFER_AND_ENCODE: 
 
-
+                break;
+            case PARITY_NOTIFY_DATANODE: 
+            
+                break;
+            // case huifu;
+            default :
+                serverLog(LL_NOTICE,"this is networking's default, and the o -> flag is %d", o -> flag);
+        }
 # endif
 
         /* Multibulk processing could see a <= 0 length. */
