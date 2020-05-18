@@ -31,6 +31,8 @@
 #define __PARITY_H
 
 #include "server.h"
+#include "dict.h"
+
 
 # ifdef _ERASURE_CODE_
 
@@ -48,4 +50,11 @@
 # define PARITY_TRANFORM_GOOD_DATA 5   // 校验节点传输恢复好的数据 然后故障节点进行重新读缓冲区即可
 
 # endif
+
+// 函数声明
+// dictEntry* doParity(client* c);
+// dictEntry* encodeParity(dictEntry* head, dictEntry* target);
+
+
+
 #endif

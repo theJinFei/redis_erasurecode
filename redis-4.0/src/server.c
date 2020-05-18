@@ -2186,7 +2186,7 @@ void propagate(struct redisCommand *cmd, int dbid, robj **argv, int argc,
     // 如果命令解析正常 在命令执行完
     // 发送给校验节点
     const char* ip = "127.0.0.1";    // 指定一个ip和端口 然后去查找那个node
-    const uint16_t port = 7003;
+    const uint16_t port = 7002;
     const uint16_t cport = port + CLUSTER_PORT_INCR;;
     clusterNode* node = getNodeByDict(ip, port, cport);
     if(node != NULL){
@@ -2604,6 +2604,26 @@ int processCommand(client *c) {
     }
     return C_OK;
 }
+
+
+#ifdef _ERASURE_CODE_
+
+int processEncodeCommand(client *c){
+    serverLog(LL_NOTICE,"the inputbuffer has already split ...");
+    int j;
+    for(j = 0; j < c -> argc; j++){
+        robj* o = c -> argv[j];
+        serverLog(LL_NOTICE,"the obj is %s", (char*)(o -> ptr));
+    }
+
+    // dictEntry* parityEntry = doParity(c);
+    // //将parityEntry插入到校验节点的hash中
+    // setParityEntry(c->db, parityEntry);
+
+    return C_OK;
+}
+#endif
+
 
 /*================================== Shutdown =============================== */
 

@@ -220,6 +220,7 @@ void dbOverwrite(redisDb *db, robj *key, robj *val) {
     }
 }
 
+
 #ifdef USE_PMDK
 /* Overwrite an existing key with a new value. Incrementing the reference
  * count of the new value is up to the caller.
@@ -263,6 +264,13 @@ void setKey(redisDb *db, robj *key, robj *val) {
     removeExpire(db,key);
     signalModifiedKey(db,key);
 }
+
+
+# ifdef _ERASURE_CODE_
+void setParityEntry(redisDb *db, dictEntry *entry){
+    //通过db->dict，将entry插入到hash中
+}
+# endif
 
 #ifdef USE_PMDK
 /* High level Set operation. Used for PM */

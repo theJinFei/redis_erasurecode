@@ -1386,7 +1386,10 @@ void processInputBuffer(client *c) {
                 serverLog(LL_NOTICE,"this is networking's PARITY_NORMAL_PROCESS, and the o -> flag is %d", o -> flag);
                 break;
             case PARITY_READ_BUFFER_AND_ENCODE: 
-
+                serverLog(LL_NOTICE,"this is networking's PARITY_READ_BUFFER_AND_ENCODE, and the o -> flag is %d", o -> flag);
+                if (processEncodeCommand(c) != C_OK){
+                    serverLog(LL_NOTICE,"Process Encode error in processInputBuffer");
+                }
                 break;
             case PARITY_NOTIFY_DATANODE: 
             

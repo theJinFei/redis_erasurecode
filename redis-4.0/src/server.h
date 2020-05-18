@@ -30,6 +30,10 @@
 #ifndef __REDIS_H
 #define __REDIS_H
 
+#ifndef _ERASURE_CODE_
+#define _ERASURE_CODE_
+#endif
+
 #include "fmacros.h"
 #include "config.h"
 #include "solarisfixes.h"
@@ -49,8 +53,11 @@
 #include <lua.h>
 #include <signal.h>
 
+
+
+
 #ifdef _ERASURE_CODE_
-#include "cluster.h"
+#include "parity.h"
 #endif
 
 #ifdef USE_PMDK
@@ -204,9 +211,7 @@ typedef long long mstime_t; /* millisecond time type. */
 #define CONFIG_DEFAULT_PM_FILE_SIZE (1024*1024*1024) /* 1GB */
 #endif
 
-#ifndef _ERASURE_CODE_
-#define _ERASURE_CODE_
-#endif
+
 
 #define ACTIVE_EXPIRE_CYCLE_LOOKUPS_PER_LOOP 20 /* Loopkups per loop. */
 #define ACTIVE_EXPIRE_CYCLE_FAST_DURATION 1000 /* Microseconds */
@@ -1692,6 +1697,12 @@ int zslLexValueLteMax(sds value, zlexrangespec *spec);
 /* Core functions */
 int freeMemoryIfNeeded(void);
 int processCommand(client *c);
+
+#ifdef _ERASURE_CODE_
+int processEncodeCommand(client *c);
+void setParityEntry(redisDb *db, dictEntry *entry);
+#endif
+
 void setupSignalHandlers(void);
 struct redisCommand *lookupCommand(sds name);
 struct redisCommand *lookupCommandByCString(char *s);
