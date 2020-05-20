@@ -1,2 +1,2 @@
-# PersistentRedis
-Replay AOF
+# Persistent + Eresurecode Redis
+

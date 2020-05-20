@@ -47,7 +47,6 @@
         "temp/": true,
         "library/": true,
         "**/*.anim": true,
-        "**/deps/": true,
     },
     "files.exclude": {
         "**/.git": true,
@@ -57,8 +56,6 @@
         "local/": true,
         "temp/": true,
         "**/*.o": true,
-        "**/tests/": true,
-        "**/deps/": true 
     }
 
 }

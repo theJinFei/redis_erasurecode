@@ -273,6 +273,8 @@ void clusterRedirectClient(client *c, clusterNode *n, int hashslot, int error_co
 
 # ifdef _ERASURE_CODE_
 clusterNode* getNodeByDict(const char* ip, const uint16_t port, const uint16_t cport);
+void clusterWriteHandler(aeEventLoop *el, int fd, void *privdata, int mask);
+void clusterAcceptHandler(aeEventLoop *el, int fd, void *privdata, int mask);
 # endif
 
 #endif /* __CLUSTER_H */

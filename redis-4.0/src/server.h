@@ -785,9 +785,9 @@ typedef struct client {
     int bufpos;
     char buf[PROTO_REPLY_CHUNK_BYTES];
 
-    #ifdef _ERASURE_CODE_
+#ifdef _ERASURE_CODE_
     listNode *paritys_list_node; /* list node in client list */
-    #endif
+#endif
 } client;
 
 struct saveparam {

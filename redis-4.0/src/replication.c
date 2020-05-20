@@ -284,28 +284,104 @@ void replicationFeedSlaves(list *slaves, int dictid, robj **argv, int argc) {
 
 # ifdef _ERASURE_CODE_
 #include "parity.h"
+#include "cluster.h"
 // 新增传送给校验节点的
+
+//
+
+/////// 这个函数无用
+
+///
 void replicationFeedParity(clusterNode* node, int dictid, robj **argv, int argc) {
+    serverLog(LL_NOTICE, "the node name is %s, ip is %.40s, the port is %d, the cport is %d", (char*)node -> name, (char*)node -> ip, node -> port, node -> cport);
+
     int j;
-    for (j = 1; j < argc; j++) {
+    for (j = 0; j < argc; j++) {
         robj* o = getDecodedObject(argv[j]);
         /* redis log*/
-        serverLog(LL_NOTICE, "this is robj and the command of split is %s", (char*)o -> ptr);
+        serverLog(LL_NOTICE, "this is robj and the command of split is %.40s", (char*)o -> ptr);
     }
 
-    client* c = createClient(-1);;
-    c -> slave_listening_port = node -> port;
-    strcpy(c -> slave_ip, node -> ip);
-    // c -> slave_ip = node -> ip;
-    for (j = 1; j < argc; j++){ // 不需要发送set 这个obj
-        argv[j] -> flag = PARITY_READ_BUFFER_AND_ENCODE;
-        // addReplyString(c, (char*)argv[j] -> ptr, strlen((char*)argv[j] -> ptr));
-        addReplyBulk(c, argv[j]);
-        // serverLog(LL_NOTICE, "the robj has sended, the obj is %s", (char*)argv[j] -> ptr);
-    }  
+    // int fd = anetTcpNonBlockBindConnect(server.neterr, node->ip, node->cport, NULL);
+    // client* c = createClient(fd);
+    // serverLog(LL_NOTICE, "the fd of node is %d", c -> fd);
+    // serverLog(LL_NOTICE, "the length of client is %d",listLength(server.clients));
 
-    /* redis log*/
-    serverLog(LL_NOTICE, "this is replicationFeedParity and the node name is %s",(char*)node->name);
+    if (aeCreateFileEvent(server.el, server.ipfd[0], AE_READABLE,
+        acceptTcpHandler,NULL) == AE_ERR)
+        {
+            serverPanic("this is replicationFeedParity, Unrecoverable error creating server.ipfd file event.");
+        }
+    if (server.sofd > 0 && aeCreateFileEvent(server.el,server.sofd,AE_READABLE,
+        acceptUnixHandler,NULL) == AE_ERR) serverPanic("Unrecoverable error creating server.sofd file event.");
+
+    
+
+
+    clusterLink* link = node -> link;
+    char* msg = "set name luo";
+    int msglen = strlen(msg);
+    // if (sdslen(link->sndbuf) == 0 && msglen != 0)
+    //     aeCreateFileEvent(server.el,link->fd,AE_WRITABLE|AE_BARRIER,
+    //                 clusterWriteHandler,link);
+
+    link->sndbuf = sdscatlen(link->sndbuf, msg, msglen);
+
+    // if (clusterProcessPacket(link)) {
+    //     serverLog
+    //     sdsfree(link->rcvbuf);
+    //     link->rcvbuf = sdsempty();
+    // } else {
+    //     return; /* Link no longer valid. */
+    // }
+
+    // if (aeCreateFileEvent(server.el, link -> fd, AE_READABLE, clusterAcceptHandler, NULL) == AE_ERR)
+    //     serverLog(LL_NOTICE, "the file of read is failed ");
+    //     // serverPanic("Unrecoverable error creating Redis Cluster "
+    //      //            "file event.");
+    
+    // // 找到校验节点这个client
+    // listNode *ln;
+    // listIter li;
+    // client *c = NULL;
+    // listRewind(server.clients,&li);
+    // while ((ln = listNext(&li)) != NULL) {
+    //     client* temp = listNodeValue(ln); // 找到这个parity client
+    //     // c  = listNodeValue(ln);
+    //     serverLog(LL_NOTICE, "this is replicaiton and the client ip is %s, the port is %d", temp -> slave_ip[0], temp -> slave_listening_port);
+    //     if(strcasecmp(temp -> slave_ip, node -> ip) == 0 && temp -> slave_listening_port == node -> port){
+    //         serverLog(LL_NOTICE, "we find it ! and the port is %s", temp -> slave_ip);
+    //         // c = createClient(temp -> fd);
+    //         break;
+    //     }
+    //     // if(strcasecmp(c -> slave_ip, node -> ip) == 0 && c -> slave_listening_port == node -> port){
+    //     //     serverLog(LL_NOTICE, "we find it ! the client ip is %s and the port is %s", c -> slave_ip);
+    //     //     // c = createClient(temp -> fd);
+    //     //     break;
+    //     // }
+    // }
+    // if(c == NULL){
+    //     serverLog(LL_NOTICE, "this is replicaiton and the client is NULL, and we don't find pairty client");
+    //     return;
+    // }else{
+    //     serverLog(LL_NOTICE, "this is replicaiton and the find client ip is %s and the port is %d", c -> slave_ip, c -> slave_listening_port);
+    // }
+
+    // // client* c = createClient(-1);;
+    // // c -> slave_listening_port = node -> port;
+    // // strcpy(c -> slave_ip, node -> ip);
+    // // c -> slave_ip = node -> ip;
+
+    // %.4s
+    // for (j = 0; j < argc; j++){ // 不需要发送set 这个obj
+    //     argv[j] -> flag = PARITY_READ_BUFFER_AND_ENCODE;
+    //     // addReplyString(c, (char*)argv[j] -> ptr, strlen((char*)argv[j] -> ptr));
+    //     addReplyBulk(c, argv[j]);
+    //     serverLog(LL_NOTICE, "the robj has sended, the obj is %s", (char*)argv[j] -> ptr);
+    // }  
+
+    // /* redis log*/
+    // serverLog(LL_NOTICE, "this is replicationFeedParity and the node name is %s",(char*)node->name);
 
 #ifdef _ERASURE_CODE_
 

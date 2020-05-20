@@ -2182,22 +2182,56 @@ void propagate(struct redisCommand *cmd, int dbid, robj **argv, int argc,
         replicationFeedSlaves(server.slaves,dbid,argv,argc);
 
 # ifdef _ERASURE_CODE_
-
-    // 如果命令解析正常 在命令执行完
-    // 发送给校验节点
-    const char* ip = "127.0.0.1";    // 指定一个ip和端口 然后去查找那个node
-    const uint16_t port = 7002;
-    const uint16_t cport = port + CLUSTER_PORT_INCR;;
-    clusterNode* node = getNodeByDict(ip, port, cport);
-    if(node != NULL){
-        replicationFeedParity(node,dbid,argv,argc);
-    }else{
+    # include "./../deps/hiredis/hiredis.h"
+ 
+    // 要发送的命令
+    int j;
+    for (j = 0; j < argc; j++) {
+        robj* o = getDecodedObject(argv[j]);
         /* redis log*/
-        serverLog(LL_NOTICE,"this is prropagate and node is null");
+        serverLog(LL_NOTICE, "this is server.c and the command of split is %.40s", (char*)o -> ptr);
     }
- # endif
 
+    // 需要封装的函数
+    if(server.port != 7002){
+        const char* ip = "127.0.0.1";
+        const uint16_t port = 7002;
+        redisContext *c = redisConnect(ip, port);
+        if (c == NULL || c->err) {
+            if (c) {
+                // printf("Error: %s\n", c->errstr);
+                serverLog(LL_NOTICE, "Error: %.40s", c->errstr);
+                
+                // handle error
+            } else {
+                // printf("Can't allocate redis context\n");
+                serverLog(LL_NOTICE, "Can't allocate redis context");
+            }
+        }
+
+        redisReply *reply;
+        /*添加命令set */
+        redisAppendCommand(c,"set foo bar");
+        /*添加命令get */
+        // redisAppendCommand(c,"GET foo");
+        /*获取set命令结果*/
+        // redisGetReply(c,&reply); // reply for SET
+        // serverLog(LL_NOTICE, "c -> obuf is %.40s",reply -> str);
+        
+        freeReplyObject(reply);
+        // /*获取get命令结果*/
+        // redisGetReply(c,&reply); // reply for GET
+
+
+        // freeReplyObject(reply);
+        redisFree(c);
+        // redisAppendCommandArgv
+    }
+     # endif
 }
+
+
+
 
 /* Used inside commands to schedule the propagation of additional commands
  * after the current command is propagated to AOF / Replication.
