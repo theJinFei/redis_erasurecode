@@ -42,7 +42,8 @@
 
 #ifdef _ERASURE_CODE_
 // 新增传送给校验节点的
-void replicationFeedParity(clusterNode* node, int dictid, robj **argv, int argc);
+// void replicationFeedParity(clusterNode* node, int dictid, robj **argv, int argc);
+void replicationFeedParitys(const char* hostip, const uint16_t port, int argc, robj** argv);
 #endif
 
 #endif

@@ -38,7 +38,10 @@
         "memory_resource": "cpp",
         "locale": "cpp",
         "ostream": "cpp",
-        "typeinfo": "cpp"
+        "typeinfo": "cpp",
+        "complex": "cpp",
+        "ios": "cpp",
+        "istream": "cpp"
     },
     "search.exclude": {        
         "**/node_modules": true,

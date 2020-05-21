@@ -285,268 +285,181 @@ void replicationFeedSlaves(list *slaves, int dictid, robj **argv, int argc) {
 # ifdef _ERASURE_CODE_
 #include "parity.h"
 #include "cluster.h"
-// 新增传送给校验节点的
+# include "./../deps/hiredis/hiredis.h"
 
-//
 
-/////// 这个函数无用
+void replicationFeedParitys(const char* hostip, const uint16_t port, int argc, robj** argv){
 
-///
-void replicationFeedParity(clusterNode* node, int dictid, robj **argv, int argc) {
-    serverLog(LL_NOTICE, "the node name is %s, ip is %.40s, the port is %d, the cport is %d", (char*)node -> name, (char*)node -> ip, node -> port, node -> cport);
-
+    // 要发送的命令
     int j;
     for (j = 0; j < argc; j++) {
         robj* o = getDecodedObject(argv[j]);
         /* redis log*/
-        serverLog(LL_NOTICE, "this is robj and the command of split is %.40s", (char*)o -> ptr);
+        serverLog(LL_NOTICE, "this is replication.c and the command of split is %.40s", (char*)o -> ptr);
     }
+    serverLog(LL_NOTICE, "the hostip is %s, the server.port is %d and the port is %d", hostip, server.port, port);
+     // 保证这个只执行一遍
+    if(server.port != port){
 
-    // int fd = anetTcpNonBlockBindConnect(server.neterr, node->ip, node->cport, NULL);
-    // client* c = createClient(fd);
-    // serverLog(LL_NOTICE, "the fd of node is %d", c -> fd);
-    // serverLog(LL_NOTICE, "the length of client is %d",listLength(server.clients));
-
-    if (aeCreateFileEvent(server.el, server.ipfd[0], AE_READABLE,
-        acceptTcpHandler,NULL) == AE_ERR)
-        {
-            serverPanic("this is replicationFeedParity, Unrecoverable error creating server.ipfd file event.");
-        }
-    if (server.sofd > 0 && aeCreateFileEvent(server.el,server.sofd,AE_READABLE,
-        acceptUnixHandler,NULL) == AE_ERR) serverPanic("Unrecoverable error creating server.sofd file event.");
-
-    
-
-
-    clusterLink* link = node -> link;
-    char* msg = "set name luo";
-    int msglen = strlen(msg);
-    // if (sdslen(link->sndbuf) == 0 && msglen != 0)
-    //     aeCreateFileEvent(server.el,link->fd,AE_WRITABLE|AE_BARRIER,
-    //                 clusterWriteHandler,link);
-
-    link->sndbuf = sdscatlen(link->sndbuf, msg, msglen);
-
-    // if (clusterProcessPacket(link)) {
-    //     serverLog
-    //     sdsfree(link->rcvbuf);
-    //     link->rcvbuf = sdsempty();
-    // } else {
-    //     return; /* Link no longer valid. */
-    // }
-
-    // if (aeCreateFileEvent(server.el, link -> fd, AE_READABLE, clusterAcceptHandler, NULL) == AE_ERR)
-    //     serverLog(LL_NOTICE, "the file of read is failed ");
-    //     // serverPanic("Unrecoverable error creating Redis Cluster "
-    //      //            "file event.");
-    
-    // // 找到校验节点这个client
-    // listNode *ln;
-    // listIter li;
-    // client *c = NULL;
-    // listRewind(server.clients,&li);
-    // while ((ln = listNext(&li)) != NULL) {
-    //     client* temp = listNodeValue(ln); // 找到这个parity client
-    //     // c  = listNodeValue(ln);
-    //     serverLog(LL_NOTICE, "this is replicaiton and the client ip is %s, the port is %d", temp -> slave_ip[0], temp -> slave_listening_port);
-    //     if(strcasecmp(temp -> slave_ip, node -> ip) == 0 && temp -> slave_listening_port == node -> port){
-    //         serverLog(LL_NOTICE, "we find it ! and the port is %s", temp -> slave_ip);
-    //         // c = createClient(temp -> fd);
-    //         break;
-    //     }
-    //     // if(strcasecmp(c -> slave_ip, node -> ip) == 0 && c -> slave_listening_port == node -> port){
-    //     //     serverLog(LL_NOTICE, "we find it ! the client ip is %s and the port is %s", c -> slave_ip);
-    //     //     // c = createClient(temp -> fd);
-    //     //     break;
-    //     // }
-    // }
-    // if(c == NULL){
-    //     serverLog(LL_NOTICE, "this is replicaiton and the client is NULL, and we don't find pairty client");
-    //     return;
-    // }else{
-    //     serverLog(LL_NOTICE, "this is replicaiton and the find client ip is %s and the port is %d", c -> slave_ip, c -> slave_listening_port);
-    // }
-
-    // // client* c = createClient(-1);;
-    // // c -> slave_listening_port = node -> port;
-    // // strcpy(c -> slave_ip, node -> ip);
-    // // c -> slave_ip = node -> ip;
-
-    // %.4s
-    // for (j = 0; j < argc; j++){ // 不需要发送set 这个obj
-    //     argv[j] -> flag = PARITY_READ_BUFFER_AND_ENCODE;
-    //     // addReplyString(c, (char*)argv[j] -> ptr, strlen((char*)argv[j] -> ptr));
-    //     addReplyBulk(c, argv[j]);
-    //     serverLog(LL_NOTICE, "the robj has sended, the obj is %s", (char*)argv[j] -> ptr);
-    // }  
-
-    // /* redis log*/
-    // serverLog(LL_NOTICE, "this is replicationFeedParity and the node name is %s",(char*)node->name);
-
-#ifdef _ERASURE_CODE_
-
-    // client 对象 需要创建是哪个服务器的客户端吗
-    // 需要先找到master的文件描述符
-    // 其他master也是一个客户端？
-    // 客户端链接生成一个fd
-    // 可能会有多个校验节点
-    // server.paritys = listCreate();
-    // client* c = createClient(-1);
-    // c->slave_listening_port = 7002;
-    // strcpy(c -> slave_ip, "127.0.0.1");
-    // listAddNodeHead(server.paritys, c);
-
-    // listIter li;
-    // listNode *ln;
-    // // int processed = listLength(server.paritys);
-
-    // listRewind(server.paritys,&li);
-    // while((ln = listNext(&li))) {
-    //     client *c = listNodeValue(ln);  
-    //     serverLog(LL_NOTICE, "the client c -> name is %s", (char*)c -> name);   // null
-    // }
-    // for (j = 1; j < argc; j++){ // 不需要发送set 这个obj
-    //      // addReplyString(c, (char*)argv[j] -> ptr, strlen((char*)argv[j] -> ptr));
-    //      addReplyBulk(c, argv[j]);
-    //      // serverLog(LL_NOTICE, "the robj has sended, the obj is %s", (char*)argv[j] -> ptr);
-    // }  
-
-    // client* c = createClient();   // 创建一个伪客户端
-    // c->slave_listening_port = 7002;
-    // strcpy(c -> slave_ip, "127.0.0.1");
-
-    // /* Finally any additional argument that was not stored inside the
-    //      * static buffer if any (from j to argc). */
-    // for (j = 0; j < argc; j++){
-    //      addReplyString(c, (char*)argv[j] -> ptr, strlen((char*)argv[j] -> ptr));
-    //      serverLog(LL_NOTICE, "the robj has sended, the obj is %s, and the len is %d", (char*)argv[j] -> ptr, (int)strlen((char*)argv[j] -> ptr));
-    // }  // 不需要发送set 这个obj
-    // addReplyBulk(c,argv[j]);
-
-# endif
-
-// 发给校验节点
-# ifdef _IS_PARITY_
-
-    // client 对象
-    /* Finally any additional argument that was not stored inside the
-         * static buffer if any (from j to argc). */
-    for (j = 0; j < argc; j++)
-        addReplyBulk(slave,argv[j]);
-
-    listNode *ln;
-    listIter li;
-    int j, len;
-    char llstr[LONG_STR_SIZE];
-
-    /* If the instance is not a top level master, return ASAP: we'll just proxy
-     * the stream of data we receive from our master instead, in order to
-     * propagate *identical* replication stream. In this way this slave can
-     * advertise the same replication ID as the master (since it shares the
-     * master replication history and has the same backlog and offsets). */
-    if (server.masterhost != NULL) return;
-
-    // 
-    /* If there aren't slaves, and there is no backlog buffer to populate,
-     * we can return ASAP. */
-    if (server.repl_backlog == NULL && listLength(slaves) == 0) return;
-
-    /* We can't have slaves attached and no backlog. */
-    serverAssert(!(listLength(slaves) != 0 && server.repl_backlog == NULL));
-
-    /* Send SELECT command to every slave if needed. */
-    // 如果有需要的话，发送 SELECT 命令，指定数据库
-    if (server.slaveseldb != dictid) {
-        robj *selectcmd;
-
-        /* For a few DBs we have pre-computed SELECT command. */
-        if (dictid >= 0 && dictid < PROTO_SHARED_SELECT_CMDS) {
-            selectcmd = shared.select[dictid];
-        } else {
-            int dictid_len;
-
-            dictid_len = ll2string(llstr,sizeof(llstr),dictid);
-            selectcmd = createObject(OBJ_STRING,
-                sdscatprintf(sdsempty(),
-                "*2\r\n$6\r\nSELECT\r\n$%d\r\n%s\r\n",
-                dictid_len, llstr));
+        redisContext *c = redisConnect(hostip, port);
+        if (c == NULL || c->err) {
+            if (c) {
+                serverLog(LL_NOTICE, "Error: %.40s", c->errstr);
+            } else {
+                serverLog(LL_NOTICE, "Can't allocate redis context");
+            }
         }
 
-        /* Add the SELECT command into the backlog. */
-        // 将 SELECT 命令添加到 backlog
-        if (server.repl_backlog) feedReplicationBacklogWithObject(selectcmd);
 
-        /* Send it to slaves. */
-        // 发送给所有从服务器
-        listRewind(slaves,&li);
-        while((ln = listNext(&li))) {
-            client *slave = ln->value;
-            if (slave->replstate == SLAVE_STATE_WAIT_BGSAVE_START) continue;
-            addReply(slave,selectcmd);
-        }
+        redisReply *reply = NULL;
+        // 需要添加非set命令 如果那边解析到了
+        /*添加命令set */
+        redisAppendCommand(c,"set foo2 bar2");
+        /*添加命令get */
+        // redisAppendCommand(c,"GET foo");
+        /*获取set命令结果*/
+        redisGetReply(c,&reply); // reply for SET
+        serverLog(LL_NOTICE, "c -> obuf is %.40s",reply -> str);
+        
+        freeReplyObject(reply);
+        // /*获取get命令结果*/
+        // redisGetReply(c,&reply); // reply for GET
 
-        if (dictid < 0 || dictid >= PROTO_SHARED_SELECT_CMDS)
-            decrRefCount(selectcmd);
+
+        // freeReplyObject(reply);
+        redisFree(c);
+        // redisAppendCommandArgv
     }
-    server.slaveseldb = dictid;
-
-    /* Write the command to the replication backlog if any. */
-    // 将命令写入到backlog
-    if (server.repl_backlog) {
-        char aux[LONG_STR_SIZE+3];
-
-        /* Add the multi bulk reply length. */
-        aux[0] = '*';
-        len = ll2string(aux+1,sizeof(aux)-1,argc);
-        aux[len+1] = '\r';
-        aux[len+2] = '\n';
-        feedReplicationBacklog(aux,len+3);
-
-        for (j = 0; j < argc; j++) {
-            long objlen = stringObjectLen(argv[j]);
-
-            /* We need to feed the buffer with the object as a bulk reply
-             * not just as a plain string, so create the $..CRLF payload len
-             * and add the final CRLF */
-            // 将参数从对象转换成协议格式
-            aux[0] = '$';
-            len = ll2string(aux+1,sizeof(aux)-1,objlen);
-            aux[len+1] = '\r';
-            aux[len+2] = '\n';
-            feedReplicationBacklog(aux,len+3);
-            feedReplicationBacklogWithObject(argv[j]);
-            feedReplicationBacklog(aux+len+1,2);
-        }
-    }
-
-    /* Write the command to every slave. */
-    listRewind(slaves,&li);
-    while((ln = listNext(&li))) {
-
-        // 指向从服务器
-        client *slave = ln->value;
-
-        /* Don't feed slaves that are still waiting for BGSAVE to start */
-        // 不要给正在等待 BGSAVE 开始的从服务器发送命令
-        if (slave->replstate == SLAVE_STATE_WAIT_BGSAVE_START) continue;
-
-        /* Feed slaves that are waiting for the initial SYNC (so these commands
-         * are queued in the output buffer until the initial SYNC completes),
-         * or are already in sync with the master. */
-        // 向已经接收完和正在接收 RDB 文件的从服务器发送命令
-        // 如果从服务器正在接收主服务器发送的 RDB 文件，
-        // 那么在初次 SYNC 完成之前，主服务器发送的内容会被放进一个缓冲区里面
-
-        /* Add the multi bulk length. */
-        addReplyMultiBulkLen(slave,argc);
-
-        /* Finally any additional argument that was not stored inside the
-         * static buffer if any (from j to argc). */
-        for (j = 0; j < argc; j++)
-            addReplyBulk(slave,argv[j]);
-    }
-    # endif
 }
+
+// // 新增传送给校验节点的
+
+// //
+
+// /////// 这个函数无用
+
+// ///
+// void replicationFeedParity(clusterNode* node, int dictid, robj **argv, int argc) {
+//     serverLog(LL_NOTICE, "the node name is %s, ip is %.40s, the port is %d, the cport is %d", (char*)node -> name, (char*)node -> ip, node -> port, node -> cport);
+
+//     int j;
+//     for (j = 0; j < argc; j++) {
+//         robj* o = getDecodedObject(argv[j]);
+//         /* redis log*/
+//         serverLog(LL_NOTICE, "this is robj and the command of split is %.40s", (char*)o -> ptr);
+//     }
+
+
+
+//     clusterLink* link = node -> link;
+//     char* msg = "set name luo";
+//     int msglen = strlen(msg);
+//     // if (sdslen(link->sndbuf) == 0 && msglen != 0)
+//     //     aeCreateFileEvent(server.el,link->fd,AE_WRITABLE|AE_BARRIER,
+//     //                 clusterWriteHandler,link);
+
+//     link->sndbuf = sdscatlen(link->sndbuf, msg, msglen);
+
+//     // if (clusterProcessPacket(link)) {
+//     //     serverLog
+//     //     sdsfree(link->rcvbuf);
+//     //     link->rcvbuf = sdsempty();
+//     // } else {
+//     //     return; /* Link no longer valid. */
+//     // }
+
+//     // if (aeCreateFileEvent(server.el, link -> fd, AE_READABLE, clusterAcceptHandler, NULL) == AE_ERR)
+//     //     serverLog(LL_NOTICE, "the file of read is failed ");
+//     //     // serverPanic("Unrecoverable error creating Redis Cluster "
+//     //      //            "file event.");
+    
+//     // // 找到校验节点这个client
+//     // listNode *ln;
+//     // listIter li;
+//     // client *c = NULL;
+//     // listRewind(server.clients,&li);
+//     // while ((ln = listNext(&li)) != NULL) {
+//     //     client* temp = listNodeValue(ln); // 找到这个parity client
+//     //     // c  = listNodeValue(ln);
+//     //     serverLog(LL_NOTICE, "this is replicaiton and the client ip is %s, the port is %d", temp -> slave_ip[0], temp -> slave_listening_port);
+//     //     if(strcasecmp(temp -> slave_ip, node -> ip) == 0 && temp -> slave_listening_port == node -> port){
+//     //         serverLog(LL_NOTICE, "we find it ! and the port is %s", temp -> slave_ip);
+//     //         // c = createClient(temp -> fd);
+//     //         break;
+//     //     }
+//     //     // if(strcasecmp(c -> slave_ip, node -> ip) == 0 && c -> slave_listening_port == node -> port){
+//     //     //     serverLog(LL_NOTICE, "we find it ! the client ip is %s and the port is %s", c -> slave_ip);
+//     //     //     // c = createClient(temp -> fd);
+//     //     //     break;
+//     //     // }
+//     // }
+//     // if(c == NULL){
+//     //     serverLog(LL_NOTICE, "this is replicaiton and the client is NULL, and we don't find pairty client");
+//     //     return;
+//     // }else{
+//     //     serverLog(LL_NOTICE, "this is replicaiton and the find client ip is %s and the port is %d", c -> slave_ip, c -> slave_listening_port);
+//     // }
+
+//     // // client* c = createClient(-1);;
+//     // // c -> slave_listening_port = node -> port;
+//     // // strcpy(c -> slave_ip, node -> ip);
+//     // // c -> slave_ip = node -> ip;
+
+//     // %.4s
+//     // for (j = 0; j < argc; j++){ // 不需要发送set 这个obj
+//     //     argv[j] -> flag = PARITY_READ_BUFFER_AND_ENCODE;
+//     //     // addReplyString(c, (char*)argv[j] -> ptr, strlen((char*)argv[j] -> ptr));
+//     //     addReplyBulk(c, argv[j]);
+//     //     serverLog(LL_NOTICE, "the robj has sended, the obj is %s", (char*)argv[j] -> ptr);
+//     // }  
+
+//     // /* redis log*/
+//     // serverLog(LL_NOTICE, "this is replicationFeedParity and the node name is %s",(char*)node->name);
+
+// #ifdef _ERASURE_CODE_
+
+//     // client 对象 需要创建是哪个服务器的客户端吗
+//     // 需要先找到master的文件描述符
+//     // 其他master也是一个客户端？
+//     // 客户端链接生成一个fd
+//     // 可能会有多个校验节点
+//     // server.paritys = listCreate();
+//     // client* c = createClient(-1);
+//     // c->slave_listening_port = 7002;
+//     // strcpy(c -> slave_ip, "127.0.0.1");
+//     // listAddNodeHead(server.paritys, c);
+
+//     // listIter li;
+//     // listNode *ln;
+//     // // int processed = listLength(server.paritys);
+
+//     // listRewind(server.paritys,&li);
+//     // while((ln = listNext(&li))) {
+//     //     client *c = listNodeValue(ln);  
+//     //     serverLog(LL_NOTICE, "the client c -> name is %s", (char*)c -> name);   // null
+//     // }
+//     // for (j = 1; j < argc; j++){ // 不需要发送set 这个obj
+//     //      // addReplyString(c, (char*)argv[j] -> ptr, strlen((char*)argv[j] -> ptr));
+//     //      addReplyBulk(c, argv[j]);
+//     //      // serverLog(LL_NOTICE, "the robj has sended, the obj is %s", (char*)argv[j] -> ptr);
+//     // }  
+
+//     // client* c = createClient();   // 创建一个伪客户端
+//     // c->slave_listening_port = 7002;
+//     // strcpy(c -> slave_ip, "127.0.0.1");
+
+//     // /* Finally any additional argument that was not stored inside the
+//     //      * static buffer if any (from j to argc). */
+//     // for (j = 0; j < argc; j++){
+//     //      addReplyString(c, (char*)argv[j] -> ptr, strlen((char*)argv[j] -> ptr));
+//     //      serverLog(LL_NOTICE, "the robj has sended, the obj is %s, and the len is %d", (char*)argv[j] -> ptr, (int)strlen((char*)argv[j] -> ptr));
+//     // }  // 不需要发送set 这个obj
+//     // addReplyBulk(c,argv[j]);
+
+// # endif
+
+
+// }
 # endif
 
 

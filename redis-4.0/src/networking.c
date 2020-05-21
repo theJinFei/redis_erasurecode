@@ -1379,25 +1379,34 @@ void processInputBuffer(client *c) {
         // 如果解析的命令中包含的flag是parity定义的类型的话
         // 进行命令解析
         // 不等于normal 就直接跳转 走parity的几个函数即可
-        robj* o = getDecodedObject(c -> argv[0]);
-        switch(o -> flag){
-            case PARITY_NORMAL_PROCESS: 
-                // donothing;
-                serverLog(LL_NOTICE,"this is networking's PARITY_NORMAL_PROCESS, and the o -> flag is %d", o -> flag);
-                break;
-            case PARITY_READ_BUFFER_AND_ENCODE: 
-                serverLog(LL_NOTICE,"this is networking's PARITY_READ_BUFFER_AND_ENCODE, and the o -> flag is %d", o -> flag);
-                if (processEncodeCommand(c) != C_OK){
-                    serverLog(LL_NOTICE,"Process Encode error in processInputBuffer");
-                }
-                break;
-            case PARITY_NOTIFY_DATANODE: 
-            
-                break;
-            // case huifu;
-            default :
-                serverLog(LL_NOTICE,"this is networking's default, and the o -> flag is %d", o -> flag);
+        if(c -> argc > 3){
+            for(int i = 0; i < c -> argc; i++){
+                robj* o = getDecodedObject(c -> argv[i]);
+                serverLog(LL_NOTICE,"o -> ptr is %s", (char *)(o -> ptr));
+                // serverLog(LL_NOTICE,"o -> ptr is %d", *(int *)(o -> ptr));
+            }
+
         }
+        
+        
+        // switch((int)o -> ptr){
+        //     // case PARITY_NORMAL_PROCESS: 
+        //     //     // donothing;
+        //     //     serverLog(LL_NOTICE,"this is networking's PARITY_NORMAL_PROCESS, and the o -> flag is %d", o -> flag);
+        //     //     break;
+        //     // case PARITY_READ_BUFFER_AND_ENCODE: 
+        //     //     serverLog(LL_NOTICE,"this is networking's PARITY_READ_BUFFER_AND_ENCODE, and the o -> flag is %d", o -> flag);
+        //     //     if (processEncodeCommand(c) != C_OK){
+        //     //         serverLog(LL_NOTICE,"Process Encode error in processInputBuffer");
+        //     //     }
+        //     //     break;
+        //     // case PARITY_NOTIFY_DATANODE: 
+            
+        //     //     break;
+        //     // case huifu;
+        //     default :
+        //         serverLog(LL_NOTICE,"this is networking's default, and the o -> flag is %d", o -> flag);
+        // }
 # endif
 
         /* Multibulk processing could see a <= 0 length. */

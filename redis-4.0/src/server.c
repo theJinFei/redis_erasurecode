@@ -2182,52 +2182,57 @@ void propagate(struct redisCommand *cmd, int dbid, robj **argv, int argc,
         replicationFeedSlaves(server.slaves,dbid,argv,argc);
 
 # ifdef _ERASURE_CODE_
-    # include "./../deps/hiredis/hiredis.h"
- 
-    // 要发送的命令
-    int j;
-    for (j = 0; j < argc; j++) {
-        robj* o = getDecodedObject(argv[j]);
-        /* redis log*/
-        serverLog(LL_NOTICE, "this is server.c and the command of split is %.40s", (char*)o -> ptr);
-    }
+# include "./../deps/hiredis/hiredis.h"
+# include "cluster.h"
 
-    // 需要封装的函数
-    if(server.port != 7002){
-        const char* ip = "127.0.0.1";
-        const uint16_t port = 7002;
-        redisContext *c = redisConnect(ip, port);
+    const char* parityip = "127.0.0.1";
+    const uint16_t port = 7002;
+    //replicationFeedParitys(parityip, port, argc, argv);
+     // 保证这个只执行一遍
+
+    serverLog(LL_NOTICE, "the server.port is %d and the port is %d", server.port, port);
+    if(server.port != port && server.cluster -> myself -> flags != CLUSTER_NODE_SLAVE){ 
+        serverLog(LL_NOTICE, "the flags is  %d and the CLUSTER_NODE_SLAVE is %d", server.cluster -> myself -> flags, CLUSTER_NODE_SLAVE);
+        
+        serverLog(LL_NOTICE, "after if, the hostip is %s, the server.port is %d and the port is %d", server.bindaddr, server.port, port);
+        redisContext *c = redisConnect(parityip, port);
         if (c == NULL || c->err) {
             if (c) {
-                // printf("Error: %s\n", c->errstr);
                 serverLog(LL_NOTICE, "Error: %.40s", c->errstr);
-                
-                // handle error
             } else {
-                // printf("Can't allocate redis context\n");
                 serverLog(LL_NOTICE, "Can't allocate redis context");
             }
         }
+    
+        redisReply *reply = NULL;
 
-        redisReply *reply;
+
+        // 需要添加非set命令 如果那边解析到了
         /*添加命令set */
-        redisAppendCommand(c,"set foo bar");
+        redisAppendCommand(c,"set foo bar 1");
+
+        serverLog(LL_NOTICE, "redisAppendCommand");
+
         /*添加命令get */
-        // redisAppendCommand(c,"GET foo");
+        // redisAppendCommand(c,"GET foo2");
         /*获取set命令结果*/
-        // redisGetReply(c,&reply); // reply for SET
-        // serverLog(LL_NOTICE, "c -> obuf is %.40s",reply -> str);
-        
+        redisGetReply(c,&reply); // reply for SET
+
         freeReplyObject(reply);
-        // /*获取get命令结果*/
-        // redisGetReply(c,&reply); // reply for GET
-
-
-        // freeReplyObject(reply);
         redisFree(c);
-        // redisAppendCommandArgv
+        // serverLog(LL_NOTICE, "c -> obuf is %.40s",reply -> str);
     }
-     # endif
+    //     freeReplyObject(reply);
+    //     // /*获取get命令结果*/
+    //     // redisGetReply(c,&reply); // reply for GET
+
+
+    //     // freeReplyObject(reply);
+    //     redisFree(c);
+    //     // redisAppendCommandArgv
+    // }
+
+# endif
 }
 
 
