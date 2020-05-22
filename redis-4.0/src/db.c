@@ -246,6 +246,15 @@ void dbOverwritePM(redisDb *db, robj *key, robj *val) {
 void setKey(redisDb *db, robj *key, robj *val) {
     if (lookupKeyWrite(db,key) == NULL) {
         dbAdd(db,key,val);
+# ifdef _ERASURE_CODE_
+    //if(c->argc >= 2){
+        //if(strcasecmp((char *)c->argv[0]->ptr,"set")){
+            server.stat_numsetcommands++;
+            serverLog(LL_NOTICE,"this is server.stat_numsetcommands++, and the server.stat_numsetcommands is %d", server.stat_numsetcommands);
+            //serverLog(LL_NOTICE,"this is server.stat_numsetcommands++, and the setcommands is %s %s %s", (char *)c->argv[0]->ptr,(char *)c->argv[1]->ptr,(char *)c->argv[2]->ptr);
+        //}
+    //}   
+# endif
         //set, diff=val
     } else {
         dbOverwrite(db,key,val);

@@ -1386,27 +1386,31 @@ void processInputBuffer(client *c) {
                 // serverLog(LL_NOTICE,"o -> ptr is %d", *(int *)(o -> ptr));
             }
 
-        }
-        
-        
-        // switch((int)o -> ptr){
-        //     // case PARITY_NORMAL_PROCESS: 
-        //     //     // donothing;
-        //     //     serverLog(LL_NOTICE,"this is networking's PARITY_NORMAL_PROCESS, and the o -> flag is %d", o -> flag);
-        //     //     break;
-        //     // case PARITY_READ_BUFFER_AND_ENCODE: 
-        //     //     serverLog(LL_NOTICE,"this is networking's PARITY_READ_BUFFER_AND_ENCODE, and the o -> flag is %d", o -> flag);
-        //     //     if (processEncodeCommand(c) != C_OK){
-        //     //         serverLog(LL_NOTICE,"Process Encode error in processInputBuffer");
-        //     //     }
-        //     //     break;
-        //     // case PARITY_NOTIFY_DATANODE: 
+            int e = *(int *)(c -> argv[3] -> ptr);
+
+            switch(e){
+            // case PARITY_NORMAL_PROCESS: 
+            //     // donothing;
+            //     serverLog(LL_NOTICE,"this is networking's PARITY_NORMAL_PROCESS, and the o -> flag is %d", o -> flag);
+            //     break;
+            case PARITY_READ_BUFFER_AND_ENCODE: 
+                serverLog(LL_NOTICE,"this is networking's PARITY_READ_BUFFER_AND_ENCODE, and the flag is %d", e);
+                // if (processEncodeCommand(c) != C_OK){
+                //     serverLog(LL_NOTICE,"Process Encode error in processInputBuffer");
+                // }
+                break;
+            case PARITY_NOTIFY_DATANODE: 
             
-        //     //     break;
-        //     // case huifu;
-        //     default :
-        //         serverLog(LL_NOTICE,"this is networking's default, and the o -> flag is %d", o -> flag);
-        // }
+                break;
+            //case huifu;
+            default :
+                serverLog(LL_NOTICE,"this is networking's default, and the o -> flag is %d", e);
+        }
+
+    }
+        
+        
+        
 # endif
 
         /* Multibulk processing could see a <= 0 length. */

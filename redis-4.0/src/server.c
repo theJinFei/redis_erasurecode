@@ -1840,6 +1840,12 @@ void resetServerStats(void) {
     int j;
 
     server.stat_numcommands = 0;
+
+# ifdef  _ERASURE_CODE_
+    server.stat_numsetcommands = 0;
+# endif
+
+
     server.stat_numconnections = 0;
     server.stat_expiredkeys = 0;
     server.stat_expired_stale_perc = 0;
@@ -2191,7 +2197,7 @@ void propagate(struct redisCommand *cmd, int dbid, robj **argv, int argc,
      // 保证这个只执行一遍
 
     serverLog(LL_NOTICE, "the server.port is %d and the port is %d", server.port, port);
-    if(server.port != port && server.cluster -> myself -> flags != CLUSTER_NODE_SLAVE){ 
+    if(server.port != port && !(server.cluster -> myself -> flags & CLUSTER_NODE_SLAVE)){ 
         serverLog(LL_NOTICE, "the flags is  %d and the CLUSTER_NODE_SLAVE is %d", server.cluster -> myself -> flags, CLUSTER_NODE_SLAVE);
         
         serverLog(LL_NOTICE, "after if, the hostip is %s, the server.port is %d and the port is %d", server.bindaddr, server.port, port);
@@ -2210,6 +2216,8 @@ void propagate(struct redisCommand *cmd, int dbid, robj **argv, int argc,
         // 需要添加非set命令 如果那边解析到了
         /*添加命令set */
         redisAppendCommand(c,"set foo bar 1");
+
+        serverLog(LL_NOTICE, "after redisAppendCommand, the server.stat_numsetcommands = %d", server.stat_numsetcommands);
 
         serverLog(LL_NOTICE, "redisAppendCommand");
 
@@ -2443,6 +2451,17 @@ void call(client *c, int flags) {
     }
     server.also_propagate = prev_also_propagate;
     server.stat_numcommands++;
+
+// # ifdef _ERASURE_CODE_
+//     if(c->argc >= 2){
+//         if(strcasecmp((char *)c->argv[0]->ptr,"set")){
+//             server.stat_numsetcommands++;
+//             serverLog(LL_NOTICE,"this is server.stat_numsetcommands++, and the server.stat_numsetcommands is %d", server.stat_numsetcommands);
+//             //serverLog(LL_NOTICE,"this is server.stat_numsetcommands++, and the setcommands is %s %s %s", (char *)c->argv[0]->ptr,(char *)c->argv[1]->ptr,(char *)c->argv[2]->ptr);
+//         }
+//     }   
+// # endif
+
 }
 
 /* If this function gets called we already read a whole
