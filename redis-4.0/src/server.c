@@ -2215,11 +2215,44 @@ void propagate(struct redisCommand *cmd, int dbid, robj **argv, int argc,
 
         // 需要添加非set命令 如果那边解析到了
         /*添加命令set */
-        redisAppendCommand(c,"set foo bar 1");
+
+        char *sendStr = (char *) malloc(sizeof(char)*100);
+        memset(sendStr,0,sizeof(char)*100);
+        for(int i=0;i<argc;i++){
+            if(argv[i]->encoding == OBJ_ENCODING_INT){
+            
+                char buf[32];
+                ll2string(buf,32,(long)argv[i]->ptr);
+
+                serverLog(LL_NOTICE, "int = %s", buf);
+                serverLog(LL_NOTICE, "argv[i]->encoding == OBJ_ENCODING_INT");
+                //*(int *)(argv[i]->ptr)
+                //char *tmpStr = (char *) malloc(sizeof(char)*10);
+                //memset(sendStr,0,sizeof(char)*10);
+                
+                //sprintf(tmpStr,"%d",*(int *)(argv[i]->ptr));
+                //serverLog(LL_NOTICE, "tmpStr = %s", tmpStr);
+                strcat(sendStr,buf);
+            }
+            else{
+                strcat(sendStr,(char*)(argv[i]->ptr));
+            }   
+            strcat(sendStr," ");
+        }
+        char buf[32];
+        ll2string(buf,32,(long)PARITY_READ_BUFFER_AND_ENCODE);
+        strcat(sendStr,buf);
+        strcat(sendStr," ");
+        ll2string(buf,32,server.stat_numsetcommands);
+        strcat(sendStr,buf);
+
+
+        //redisAppendCommand(c,"set foo bar 1");
+        redisAppendCommand(c,sendStr);
 
         serverLog(LL_NOTICE, "after redisAppendCommand, the server.stat_numsetcommands = %d", server.stat_numsetcommands);
 
-        serverLog(LL_NOTICE, "redisAppendCommand");
+        serverLog(LL_NOTICE, "sendStr = %s",sendStr);
 
         /*添加命令get */
         // redisAppendCommand(c,"GET foo2");
