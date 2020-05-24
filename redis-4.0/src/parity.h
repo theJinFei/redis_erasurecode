@@ -41,13 +41,15 @@
 // ENCODE
 # define PARITY_READ_BUFFER_AND_ENCODE 1   // 编码过程
 
+# define PARITY_READ_BUFFER_AND_UPDATE 2
+
 // DECODE
-# define PARITY_NOTIFY_DATANODE 2   // 校验节点 通知其他数据节点 启动恢复
-# define PARIYT_DATANODE_TRANSFORM_DATA 3  // 数据节点 收到这个标志 表示要传输特定位置的数据
-# define PARIYT_READ_BUFFER_AND_DECODE 4 // 校验节点 收到标志 表示读缓冲区 进行解码
+# define PARITY_NOTIFY_DATANODE 3   // 校验节点 通知其他数据节点 启动恢复
+# define PARIYT_DATANODE_TRANSFORM_DATA 4  // 数据节点 收到这个标志 表示要传输特定位置的数据
+# define PARIYT_READ_BUFFER_AND_DECODE 5 // 校验节点 收到标志 表示读缓冲区 进行解码
 
 // 传输给故障节点
-# define PARITY_TRANFORM_GOOD_DATA 5   // 校验节点传输恢复好的数据 然后故障节点进行重新读缓冲区即可
+# define PARITY_TRANFORM_GOOD_DATA 6   // 校验节点传输恢复好的数据 然后故障节点进行重新读缓冲区即可
 
 # endif
 

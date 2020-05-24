@@ -267,7 +267,6 @@ void setKey(redisDb *db, robj *key, robj *val) {
 //     /* We also add the key ref */
 //     incrCommandCnt(key);
 //     /* transfer the (key + robj) to the parity*/
-
 // #endif
 
     removeExpire(db,key);

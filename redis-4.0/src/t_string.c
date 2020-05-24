@@ -108,10 +108,56 @@ void setGenericCommand(client *c, int flags, robj *key, robj *val, robj *expire,
         setKey(c->db,key,val);
     }
 #else
+    robj* temp = lookupKeyWrite(c -> db,key);
     setKey(c->db,key,val);
 #endif
 
+# ifdef _ERASURE_CODE_
+    // 执行覆盖写
+    // 执行增量
+    if(temp != NULL){
+        
+        serverLog(LL_NOTICE, "the temp is %s", (char*)temp -> ptr);
+        serverLog(LL_NOTICE, "the value is %s", (char*)val -> ptr);
+        char* a = (char*)val -> ptr;
+        char* b=  (char*)temp -> ptr;
+        int lenA = strlen(a);
+        int lenB = strlen(b);
+        // 先让其对齐 以后改
+        // if(lenA > lenB){
+        //     for(int i = 0; i < lenA - lenB; i++){
+        //         strcat(b, '0');
+        //     }
+        // }else{
+        //     for(int i = 0; i < lenB - lenA; i++){
+        //         strcat(a, '0');
+        //     }
+        // }
+        // funAlign(char* a, char* b)
+        if(lenA < lenB){
+            for(int i = 0; i < lenA; i++){
+                b[i] ^= a[i];
+            }
+            serverLog(LL_NOTICE, "the char* b is %s", b);
+            feedParityXOR(b);
+        }else{
+            for(int i = 0; i < lenA; i++){
+                a[i] ^= b[i];
+            }
+            serverLog(LL_NOTICE, "the char* a is %s", a);
+            feedParityXOR(a);
+        }
 
+        
+        // serverLog(LL_NOTICE, "the char* a is %s", a);
+        // serverLog(LL_NOTICE, "the char* b is %s", b);
+        // char* parityXOR = *(char*)val -> ptr  ^ *(char*)temp -> ptr;    //把temp发送给校验节点
+        // 在这里调用networking的函数
+        
+    }else{
+        feedParityARGV(c -> argc, c -> argv);
+    }
+# endif
     
     server.dirty++;
     if (expire) setExpire(c,c->db,key,mstime()+milliseconds);

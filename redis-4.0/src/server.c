@@ -631,6 +631,20 @@ dictType dbDictTypePM = {
 };
 #endif
 
+
+# ifdef _ERASURE_CODE_
+/* Db->dict, keys are sds strings, vals are Redis objects. */
+dictType dbDictTypePairty = {
+    dictSdsHash,                /* hash function */
+    NULL,                       /* key dup */
+    NULL,                       /* val dup */
+    dictSdsKeyCompare,          /* key compare */
+    NULL,                       /* key destructor */
+    NULL                        /* val destructor */
+};
+# endif
+
+
 /* server.lua_scripts sha (as sds string) -> scripts (as robj) cache. */
 dictType shaScriptObjectDictType = {
     dictSdsCaseHash,            /* hash function */
@@ -1559,6 +1573,11 @@ void initServerConfig(void) {
      * initial configuration, since command names may be changed via
      * redis.conf using the rename-command directive. */
     server.commands = dictCreate(&commandTableDictType,NULL);
+
+# ifdef _ERASURE_CODE_
+    server.parityDict = dictCreate(&dbDictTypePairty, NULL);
+# endif
+
     server.orig_commands = dictCreate(&commandTableDictType,NULL);
     populateCommandTable();
     server.delCommand = lookupCommandByCString("del");
@@ -2187,93 +2206,80 @@ void propagate(struct redisCommand *cmd, int dbid, robj **argv, int argc,
     if (flags & PROPAGATE_REPL)
         replicationFeedSlaves(server.slaves,dbid,argv,argc);
 
-# ifdef _ERASURE_CODE_
-# include "./../deps/hiredis/hiredis.h"
-# include "cluster.h"
 
-    const char* parityip = "127.0.0.1";
-    const uint16_t port = 7002;
-    //replicationFeedParitys(parityip, port, argc, argv);
-     // 保证这个只执行一遍
-
-    serverLog(LL_NOTICE, "the server.port is %d and the port is %d", server.port, port);
-    if(server.port != port && !(server.cluster -> myself -> flags & CLUSTER_NODE_SLAVE)){ 
-        serverLog(LL_NOTICE, "the flags is  %d and the CLUSTER_NODE_SLAVE is %d", server.cluster -> myself -> flags, CLUSTER_NODE_SLAVE);
-        
-        serverLog(LL_NOTICE, "after if, the hostip is %s, the server.port is %d and the port is %d", server.bindaddr, server.port, port);
-        redisContext *c = redisConnect(parityip, port);
-        if (c == NULL || c->err) {
-            if (c) {
-                serverLog(LL_NOTICE, "Error: %.40s", c->errstr);
-            } else {
-                serverLog(LL_NOTICE, "Can't allocate redis context");
-            }
-        }
+    // 应该把下面的内容封装称函数 供dbadd下面进行调用
+    // feedParityARGV(argc, argv);
     
-        redisReply *reply = NULL;
+
+// # ifdef _ERASURE_CODE_
+// # include "./../deps/hiredis/hiredis.h"
+// # include "cluster.h"
+
+    // // 这里是不是应该不写这里？应该写db.c 插入到数据库之后，应该计算差值，实现value增量更新。
+    // const char* parityip = "127.0.0.1";
+    // const uint16_t port = 7002;
+    // //replicationFeedParitys(parityip, port, argc, argv);
+    //  // 保证这个只执行一遍
+
+    // serverLog(LL_NOTICE, "the server.port is %d and the port is %d", server.port, port);
+    // if(server.port != port && !(server.cluster -> myself -> flags & CLUSTER_NODE_SLAVE)){ 
+    //     serverLog(LL_NOTICE, "the flags is  %d and the CLUSTER_NODE_SLAVE is %d", server.cluster -> myself -> flags, CLUSTER_NODE_SLAVE);
+        
+    //     serverLog(LL_NOTICE, "after if, the hostip is %s, the server.port is %d and the port is %d", server.bindaddr, server.port, port);
+    //     redisContext *c = redisConnect(parityip, port);
+    //     if (c == NULL || c->err) {
+    //         if (c) {
+    //             serverLog(LL_NOTICE, "Error: %.40s", c->errstr);
+    //         } else {
+    //             serverLog(LL_NOTICE, "Can't allocate redis context");
+    //         }
+    //     }
+    
+    //     redisReply *reply = NULL;
 
 
-        // 需要添加非set命令 如果那边解析到了
-        /*添加命令set */
+    //     // 需要添加非set命令 如果那边解析到了
+    //     /*添加命令set */
+    //     char *sendStr = (char *) malloc(sizeof(char)*100);
+    //     memset(sendStr,0,sizeof(char)*100);
+    //     for(int i=0;i<argc;i++){
+    //         if(argv[i]->encoding == OBJ_ENCODING_INT){
+    //             char buf[32];
+    //             ll2string(buf,32,(long)argv[i]->ptr);
 
-        char *sendStr = (char *) malloc(sizeof(char)*100);
-        memset(sendStr,0,sizeof(char)*100);
-        for(int i=0;i<argc;i++){
-            if(argv[i]->encoding == OBJ_ENCODING_INT){
-            
-                char buf[32];
-                ll2string(buf,32,(long)argv[i]->ptr);
+    //             serverLog(LL_NOTICE, "int = %s", buf);
+    //             serverLog(LL_NOTICE, "argv[i]->encoding == OBJ_ENCODING_INT");
 
-                serverLog(LL_NOTICE, "int = %s", buf);
-                serverLog(LL_NOTICE, "argv[i]->encoding == OBJ_ENCODING_INT");
-                //*(int *)(argv[i]->ptr)
-                //char *tmpStr = (char *) malloc(sizeof(char)*10);
-                //memset(sendStr,0,sizeof(char)*10);
-                
-                //sprintf(tmpStr,"%d",*(int *)(argv[i]->ptr));
-                //serverLog(LL_NOTICE, "tmpStr = %s", tmpStr);
-                strcat(sendStr,buf);
-            }
-            else{
-                strcat(sendStr,(char*)(argv[i]->ptr));
-            }   
-            strcat(sendStr," ");
-        }
-        char buf[32];
-        ll2string(buf,32,(long)PARITY_READ_BUFFER_AND_ENCODE);
-        strcat(sendStr,buf);
-        strcat(sendStr," ");
-        ll2string(buf,32,server.stat_numsetcommands);
-        strcat(sendStr,buf);
+    //             strcat(sendStr,buf);
+    //         }
+    //         else{
+    //             strcat(sendStr,(char*)(argv[i]->ptr));
+    //         }   
+    //         strcat(sendStr," ");
+    //     }
+    //     char buf[32];
+    //     ll2string(buf,32,(long)PARITY_READ_BUFFER_AND_ENCODE);
+    //     strcat(sendStr,buf);
+    //     strcat(sendStr," ");
+    //     ll2string(buf,32,server.stat_numsetcommands);
+    //     strcat(sendStr,buf);
 
+    //     //redisAppendCommand(c,"set foo bar 1");
+    //     redisAppendCommand(c,sendStr);
 
-        //redisAppendCommand(c,"set foo bar 1");
-        redisAppendCommand(c,sendStr);
+    //     serverLog(LL_NOTICE, "after redisAppendCommand, the server.stat_numsetcommands = %d", server.stat_numsetcommands);
 
-        serverLog(LL_NOTICE, "after redisAppendCommand, the server.stat_numsetcommands = %d", server.stat_numsetcommands);
+    //     serverLog(LL_NOTICE, "sendStr = %s",sendStr);
+    //     /*获取set命令结果*/
+    //     redisGetReply(c,&reply); // reply for SET
 
-        serverLog(LL_NOTICE, "sendStr = %s",sendStr);
-
-        /*添加命令get */
-        // redisAppendCommand(c,"GET foo2");
-        /*获取set命令结果*/
-        redisGetReply(c,&reply); // reply for SET
-
-        freeReplyObject(reply);
-        redisFree(c);
-        // serverLog(LL_NOTICE, "c -> obuf is %.40s",reply -> str);
-    }
     //     freeReplyObject(reply);
-    //     // /*获取get命令结果*/
-    //     // redisGetReply(c,&reply); // reply for GET
-
-
-    //     // freeReplyObject(reply);
     //     redisFree(c);
-    //     // redisAppendCommandArgv
+    //     // serverLog(LL_NOTICE, "c -> obuf is %.40s",reply -> str);
     // }
 
-# endif
+
+// # endif
 }
 
 
@@ -2698,7 +2704,7 @@ int processCommand(client *c) {
 
 
 #ifdef _ERASURE_CODE_
-
+// 将收到的消息写入校验节点 应该把key value插入到hash表中
 int processEncodeCommand(client *c){
     serverLog(LL_NOTICE,"the inputbuffer has already split ...");
     int j;
@@ -2706,10 +2712,29 @@ int processEncodeCommand(client *c){
         robj* o = c -> argv[j];
         serverLog(LL_NOTICE,"the obj is %s", (char*)(o -> ptr));
     }
+    // 需要做一次判断 是否命令个数
+    dictEntry *entry = malloc(sizeof(*entry));
 
-    // dictEntry* parityEntry = doParity(c);
-    // //将parityEntry插入到校验节点的hash中
-    // setParityEntry(c->db, parityEntry);
+    // 进行赋值
+    entry -> key = c -> argv[1];
+    entry -> v.val = c -> argv[2];
+    entry -> stat_set_commands = c -> argv[4];
+
+    // if(c -> argc[3] == PARITY_READ_BUFFER_AND_UPDATE){  // 说明已经有了
+
+    // }else{
+
+    // }
+    dictEntry* temp;
+    // 如果为空，证明是编码过程直接插入即可
+    if(temp = dictFind(server.parityDict, entry -> stat_set_commands) == NULL){
+        // dictAdd(server.parityDict, entry -> stat_set_commands, entry);
+
+    }else{
+        // entry -> v.val ^= temp -> v.val; // 否则，说明是更新过程，取出相应的值，做一下异或操作，替换
+        // dictReplace(server.parityDict, entry -> stat_set_commands, entry);
+    }
+
 
     return C_OK;
 }

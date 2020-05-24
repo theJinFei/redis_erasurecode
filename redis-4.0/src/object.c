@@ -55,9 +55,9 @@ robj *createObject(int type, void *ptr) {
     o->ptr = ptr;
     o->refcount = 1;
 
-# ifdef _ERASURE_CODE_
-    o -> flag = PARITY_NORMAL_PROCESS;
-# endif
+// # ifdef _ERASURE_CODE_
+//     o -> flag = PARITY_NORMAL_PROCESS;
+// # endif
 
 
     /* Set the LRU to the current lruclock (minutes resolution), or
@@ -144,9 +144,9 @@ robj *createEmbeddedStringObject(const char *ptr, size_t len) {
         memset(sh->buf,0,len+1);
     }
 
-    # ifdef _ERASURE_CODE_
-        o -> flag = PARITY_NORMAL_PROCESS;
-    # endif
+    // # ifdef _ERASURE_CODE_
+    //     o -> flag = PARITY_NORMAL_PROCESS;
+    // # endif
     return o;
 }
 

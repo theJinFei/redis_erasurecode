@@ -41,7 +41,9 @@
         "typeinfo": "cpp",
         "complex": "cpp",
         "ios": "cpp",
-        "istream": "cpp"
+        "istream": "cpp",
+        "__threading_support": "c",
+        "mutex": "c"
     },
     "search.exclude": {        
         "**/node_modules": true,

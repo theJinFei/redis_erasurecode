@@ -644,7 +644,7 @@ typedef struct redisObject {
 
     #ifdef _ERASURE_CODE_
         // int cnt = 0;
-        unsigned int flag;
+        // unsigned int flag;
     #endif
 } robj;
 
@@ -941,6 +941,9 @@ struct redisServer {
     int hz;                     /* serverCron() calls frequency in hertz */
     redisDb *db;
     dict *commands;             /* Command table */
+# ifdef _ERASURE_CODE_
+    dict* parityDict;
+# endif
     dict *orig_commands;        /* Command table before command renaming. */
     aeEventLoop *el;
     unsigned int lruclock;      /* Clock for LRU eviction */
@@ -1580,6 +1583,12 @@ ssize_t syncReadLine(int fd, char *ptr, ssize_t size, long long timeout);
 
 /* Replication */
 void replicationFeedSlaves(list *slaves, int dictid, robj **argv, int argc);
+
+# ifdef _ERASURE_CODE_
+void feedParityARGV(const int argc, robj** argv);
+void feedParityXOR(const char* parityXOR);
+# endif
+
 void replicationFeedSlavesFromMasterStream(list *slaves, char *buf, size_t buflen);
 void replicationFeedMonitors(client *c, list *monitors, int dictid, robj **argv, int argc);
 void updateSlavesWaitingBgsave(int bgsaveerr, int type);

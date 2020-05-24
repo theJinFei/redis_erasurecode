@@ -35,11 +35,17 @@
 
 #include <stdint.h>
 
+
+
 #ifndef __DICT_H
 #define __DICT_H
 
 #define DICT_OK 0
 #define DICT_ERR 1
+
+
+
+// #include "server.h"
 
 /* Unused arguments generate annoying warnings... */
 #define DICT_NOTUSED(V) ((void) V)
@@ -53,8 +59,8 @@ typedef struct dictEntry {
         double d;
     } v;
     struct dictEntry *next;
-#ifdef _ERASUER_CODE_
-    int cntCommand;
+#ifdef _ERASURE_CODE_
+    long long stat_set_commands;
 #endif
 
 } dictEntry;

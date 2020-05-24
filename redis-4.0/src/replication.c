@@ -286,22 +286,18 @@ void replicationFeedSlaves(list *slaves, int dictid, robj **argv, int argc) {
 #include "parity.h"
 #include "cluster.h"
 # include "./../deps/hiredis/hiredis.h"
+void feedParityARGV(const int argc, robj** argv){
 
-
-void replicationFeedParitys(const char* hostip, const uint16_t port, int argc, robj** argv){
-
-    // 要发送的命令
-    int j;
-    for (j = 0; j < argc; j++) {
-        robj* o = getDecodedObject(argv[j]);
-        /* redis log*/
-        serverLog(LL_NOTICE, "this is replication.c and the command of split is %.40s", (char*)o -> ptr);
-    }
-    serverLog(LL_NOTICE, "the hostip is %s, the server.port is %d and the port is %d", hostip, server.port, port);
+    // 这里是不是应该不写这里？应该写db.c 插入到数据库之后，应该计算差值，实现value增量更新。
+    const char* parityip = "127.0.0.1";
+    const uint16_t port = 7002;
      // 保证这个只执行一遍
-    if(server.port != port){
-
-        redisContext *c = redisConnect(hostip, port);
+    serverLog(LL_NOTICE, "the server.port is %d and the port is %d", server.port, port);
+    if(server.port != port && !(server.cluster -> myself -> flags & CLUSTER_NODE_SLAVE)){ 
+        serverLog(LL_NOTICE, "the flags is  %d and the CLUSTER_NODE_SLAVE is %d", server.cluster -> myself -> flags, CLUSTER_NODE_SLAVE);
+        
+        serverLog(LL_NOTICE, "after feedParityARGV, the hostip is %s, the server.port is %d and the port is %d", server.bindaddr, server.port, port);
+        redisContext *c = redisConnect(parityip, port);
         if (c == NULL || c->err) {
             if (c) {
                 serverLog(LL_NOTICE, "Error: %.40s", c->errstr);
@@ -309,28 +305,172 @@ void replicationFeedParitys(const char* hostip, const uint16_t port, int argc, r
                 serverLog(LL_NOTICE, "Can't allocate redis context");
             }
         }
-
-
+    
         redisReply *reply = NULL;
+
+
         // 需要添加非set命令 如果那边解析到了
         /*添加命令set */
-        redisAppendCommand(c,"set foo2 bar2");
+
+        char *sendStr = (char *) malloc(sizeof(char)*100);
+        memset(sendStr,0,sizeof(char)*100);
+        for(int i=0;i<argc;i++){
+            if(argv[i]->encoding == OBJ_ENCODING_INT){
+            
+                char buf[32];
+                ll2string(buf,32,(long)argv[i]->ptr);
+
+                serverLog(LL_NOTICE, "int = %s", buf);
+                serverLog(LL_NOTICE, "argv[i]->encoding == OBJ_ENCODING_INT");
+                //*(int *)(argv[i]->ptr)
+                //char *tmpStr = (char *) malloc(sizeof(char)*10);
+                //memset(sendStr,0,sizeof(char)*10);
+                
+                //sprintf(tmpStr,"%d",*(int *)(argv[i]->ptr));
+                //serverLog(LL_NOTICE, "tmpStr = %s", tmpStr);
+                strcat(sendStr,buf);
+            }
+            else{
+                strcat(sendStr,(char*)(argv[i]->ptr));
+            }   
+            strcat(sendStr," ");
+        }
+        char buf[32];
+        ll2string(buf,32,(long)PARITY_READ_BUFFER_AND_ENCODE);
+        strcat(sendStr,buf);
+        strcat(sendStr," ");
+        ll2string(buf,32,server.stat_numsetcommands);
+        strcat(sendStr,buf);
+
+
+        //redisAppendCommand(c,"set foo bar 1");
+        redisAppendCommand(c,sendStr);
+
+        serverLog(LL_NOTICE, "after redisAppendCommand, the server.stat_numsetcommands = %d", server.stat_numsetcommands);
+
+        serverLog(LL_NOTICE, "sendStr = %s",sendStr);
+
         /*添加命令get */
-        // redisAppendCommand(c,"GET foo");
+        // redisAppendCommand(c,"GET foo2");
         /*获取set命令结果*/
         redisGetReply(c,&reply); // reply for SET
-        serverLog(LL_NOTICE, "c -> obuf is %.40s",reply -> str);
-        
+        serverLog(LL_NOTICE, "the reply is %s", reply -> str);
         freeReplyObject(reply);
-        // /*获取get命令结果*/
-        // redisGetReply(c,&reply); // reply for GET
-
-
-        // freeReplyObject(reply);
         redisFree(c);
-        // redisAppendCommandArgv
+        // serverLog(LL_NOTICE, "the message has already sended .... ");
+    }
+
+}
+void feedParityXOR(const char* parityXOR)
+{
+    // 把这个XOR增量进行发送即可
+        // 这里是不是应该不写这里？应该写db.c 插入到数据库之后，应该计算差值，实现value增量更新。
+    const char* parityip = "127.0.0.1";
+    const uint16_t port = 7002;
+     // 保证这个只执行一遍
+    serverLog(LL_NOTICE, "the server.port is %d and the port is %d", server.port, port);
+    if(server.port != port && !(server.cluster -> myself -> flags & CLUSTER_NODE_SLAVE)){ 
+        serverLog(LL_NOTICE, "the flags is  %d and the CLUSTER_NODE_SLAVE is %d", server.cluster -> myself -> flags, CLUSTER_NODE_SLAVE);
+        
+        serverLog(LL_NOTICE, "after feedParityXOR, the hostip is %s, the server.port is %d and the port is %d", server.bindaddr, server.port, port);
+        redisContext *c = redisConnect(parityip, port);
+        if (c == NULL || c->err) {
+            if (c) {
+                serverLog(LL_NOTICE, "Error: %.40s", c->errstr);
+            } else {
+                serverLog(LL_NOTICE, "Can't allocate redis context");
+            }
+        }
+    
+        redisReply *reply = NULL;
+
+
+        // 需要添加非set命令 如果那边解析到了
+        /*添加命令set */
+
+        // char *sendStr = (char *) malloc(sizeof(char)*100);
+        // memset(sendStr,0,sizeof(char)*100);
+        // set 
+        // key
+        // pairtyXOR
+        // flag 阶段
+        // set_commands
+
+        char *sendStr = (char *) malloc(sizeof(char)*100);
+        memset(sendStr,0,sizeof(char)*100); 
+       
+        strcat(sendStr,"set key ");
+        strcat(sendStr, parityXOR);
+        strcat(sendStr, " ");
+
+        char buf[32];
+        ll2string(buf,32,(long)PARITY_READ_BUFFER_AND_UPDATE);
+        strcat(sendStr,buf);
+        strcat(sendStr," ");
+        ll2string(buf,32,server.stat_numsetcommands);
+        strcat(sendStr,buf);
+
+        redisAppendCommand(c,sendStr);
+
+        serverLog(LL_NOTICE, "after feedParityXOR, the server.stat_numsetcommands = %d", server.stat_numsetcommands);
+
+        // 这个有问题 非字符 不识别？
+        serverLog(LL_NOTICE, "sendStr = %s", sendStr);
+
+        /*添加命令get */
+        // redisAppendCommand(c,"GET foo2");
+        /*获取set命令结果*/
+        redisGetReply(c,&reply); // reply for SET
+        serverLog(LL_NOTICE, "the reply is %s", reply -> str);
+        freeReplyObject(reply);
+        redisFree(c);
+        // serverLog(LL_NOTICE, "the message has already sended .... ");
     }
 }
+
+// void replicationFeedParitys(const char* hostip, const uint16_t port, int argc, robj** argv){
+
+//     // 要发送的命令
+//     int j;
+//     for (j = 0; j < argc; j++) {
+//         robj* o = getDecodedObject(argv[j]);
+//         /* redis log*/
+//         serverLog(LL_NOTICE, "this is replication.c and the command of split is %.40s", (char*)o -> ptr);
+//     }
+//     serverLog(LL_NOTICE, "the hostip is %s, the server.port is %d and the port is %d", hostip, server.port, port);
+//      // 保证这个只执行一遍
+//     if(server.port != port){
+
+//         redisContext *c = redisConnect(hostip, port);
+//         if (c == NULL || c->err) {
+//             if (c) {
+//                 serverLog(LL_NOTICE, "Error: %.40s", c->errstr);
+//             } else {
+//                 serverLog(LL_NOTICE, "Can't allocate redis context");
+//             }
+//         }
+
+
+//         redisReply *reply = NULL;
+//         // 需要添加非set命令 如果那边解析到了
+//         /*添加命令set */
+//         redisAppendCommand(c,"set foo2 bar2");
+//         /*添加命令get */
+//         // redisAppendCommand(c,"GET foo");
+//         /*获取set命令结果*/
+//         redisGetReply(c,&reply); // reply for SET
+//         serverLog(LL_NOTICE, "c -> obuf is %.40s",reply -> str);
+        
+//         freeReplyObject(reply);
+//         // /*获取get命令结果*/
+//         // redisGetReply(c,&reply); // reply for GET
+
+
+//         // freeReplyObject(reply);
+//         redisFree(c);
+//         // redisAppendCommandArgv
+//     }
+// }
 
 // // 新增传送给校验节点的
 
