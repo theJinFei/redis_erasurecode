@@ -1006,6 +1006,7 @@ struct redisServer {
 
 # ifdef _ERASURE_CODE_
     long long stat_numsetcommands;     /* Number of processed set commands */
+    int cntflag;
 # endif
 
     long long stat_numconnections;  /* Number of connections received */
@@ -1585,8 +1586,8 @@ ssize_t syncReadLine(int fd, char *ptr, ssize_t size, long long timeout);
 void replicationFeedSlaves(list *slaves, int dictid, robj **argv, int argc);
 
 # ifdef _ERASURE_CODE_
-void feedParityARGV(const int argc, robj** argv);
-void feedParityXOR(const char* parityXOR);
+void feedParityARGV(client *c, const int argc, robj** argv);
+void feedParityXOR(client *c, const char* parityXOR);
 # endif
 
 void replicationFeedSlavesFromMasterStream(list *slaves, char *buf, size_t buflen);

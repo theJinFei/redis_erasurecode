@@ -1404,7 +1404,7 @@ void processInputBuffer(client *c) {
                 break;
             case PARITY_READ_BUFFER_AND_UPDATE: 
                 serverLog(LL_NOTICE,"this is networking's PARITY_READ_BUFFER_AND_UPDATE, and the flag is %d", e[0] - '0');
-                char * str1 = "luo";
+                char* str1 = "luo";
                 char* str2 = (char*)(c -> argv[2] -> ptr);
                 int len1 = strlen(str1);
                 int len2 = strlen(str2);

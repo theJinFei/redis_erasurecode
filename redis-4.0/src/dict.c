@@ -50,6 +50,14 @@
 #include "pmem.h"
 #endif
 
+#ifndef _ERASURE_CODE_
+#define _ERASURE_CODE_
+#endif
+
+#ifdef _ERASURE_CODE_
+#include "server.h"
+#endif
+
 #include "dict.h"
 #include "zmalloc.h"
 #ifndef DICT_BENCHMARK_MAIN
@@ -271,7 +279,17 @@ static void _dictRehashStep(dict *d) {
 /* Add an element to the target hash table */
 int dictAdd(dict *d, void *key, void *val)
 {
-    dictEntry *entry = dictAddRaw(d,key,NULL);
+    dictEntry *entry = dictAddRaw(d,key,NULL);  
+    
+#ifdef _ERASURE_CODE_
+//   serverLog(LL_NOTICE, "in the dictAdd, test running state");
+//   entry -> stat_set_commands = server.stat_numsetcommands;
+    if(server.cntflag == 1){
+        entry->stat_set_commands = server.stat_numsetcommands;
+        serverLog(LL_NOTICE, "in the dictAdd, the entry->stat_set_commands = %d", entry->stat_set_commands);
+    }
+    
+#endif
 
     if (!entry) return DICT_ERR;
     dictSetVal(d, entry, val);
@@ -328,6 +346,12 @@ dictEntry *dictAddRaw(dict *d, void *key, dictEntry **existing)
      * more frequently. */
     ht = dictIsRehashing(d) ? &d->ht[1] : &d->ht[0];
     entry = zmalloc(sizeof(*entry));
+
+// #ifdef _ERASURE_CODE_
+//     entry -> stat_set_commands = server.stat_numsetcommands;
+//     serverLog(LL_NOTICE, "in the entry init, the entry->stat_set_commands = %d", entry->stat_set_commands);
+// #endif
+
     entry->next = ht->table[index];
     ht->table[index] = entry;
     ht->used++;

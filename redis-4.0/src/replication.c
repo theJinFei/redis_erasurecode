@@ -286,7 +286,7 @@ void replicationFeedSlaves(list *slaves, int dictid, robj **argv, int argc) {
 #include "parity.h"
 #include "cluster.h"
 # include "./../deps/hiredis/hiredis.h"
-void feedParityARGV(const int argc, robj** argv){
+void feedParityARGV(client *cl, const int argc, robj** argv){
 
     // 这里是不是应该不写这里？应该写db.c 插入到数据库之后，应该计算差值，实现value增量更新。
     const char* parityip = "127.0.0.1";
@@ -339,14 +339,19 @@ void feedParityARGV(const int argc, robj** argv){
         ll2string(buf,32,(long)PARITY_READ_BUFFER_AND_ENCODE);
         strcat(sendStr,buf);
         strcat(sendStr," ");
-        ll2string(buf,32,server.stat_numsetcommands);
+
+        dictEntry *entry = dictFind(cl->db->dict, argv[1]->ptr);
+        serverLog(LL_NOTICE, "in the feedParityARGV, the entry->stat_set_commands = %d", entry->stat_set_commands);
+
+
+        ll2string(buf,32,entry->stat_set_commands);
         strcat(sendStr,buf);
 
 
         //redisAppendCommand(c,"set foo bar 1");
         redisAppendCommand(c,sendStr);
 
-        serverLog(LL_NOTICE, "after redisAppendCommand, the server.stat_numsetcommands = %d", server.stat_numsetcommands);
+        //serverLog(LL_NOTICE, "after redisAppendCommand, the server.stat_numsetcommands = %d", server.stat_numsetcommands);
 
         serverLog(LL_NOTICE, "sendStr = %s",sendStr);
 
@@ -361,7 +366,7 @@ void feedParityARGV(const int argc, robj** argv){
     }
 
 }
-void feedParityXOR(const char* parityXOR)
+void feedParityXOR(client* cl, const char* parityXOR)
 {
     // 把这个XOR增量进行发送即可
         // 这里是不是应该不写这里？应该写db.c 插入到数据库之后，应该计算差值，实现value增量更新。
@@ -407,7 +412,12 @@ void feedParityXOR(const char* parityXOR)
         ll2string(buf,32,(long)PARITY_READ_BUFFER_AND_UPDATE);
         strcat(sendStr,buf);
         strcat(sendStr," ");
-        ll2string(buf,32,server.stat_numsetcommands);
+        //ll2string(buf,32,server.stat_numsetcommands);
+
+        dictEntry *entry = dictFind(cl->db->dict, cl->argv[1]->ptr);
+        serverLog(LL_NOTICE, "in the feedParityXOR, the entry->stat_set_commands = %d", entry->stat_set_commands);
+        ll2string(buf,32,entry->stat_set_commands);
+
         strcat(sendStr,buf);
 
         redisAppendCommand(c,sendStr);

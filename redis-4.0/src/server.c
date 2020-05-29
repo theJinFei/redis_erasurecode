@@ -1907,6 +1907,10 @@ void initServer(void) {
     }
 
     server.pid = getpid();
+
+# ifdef _ERASURE_CODE_
+    server.cntflag = 0;
+# endif
     server.current_client = NULL;
     server.clients = listCreate();
     server.clients_to_close = listCreate();

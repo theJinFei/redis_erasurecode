@@ -116,7 +116,16 @@ void setGenericCommand(client *c, int flags, robj *key, robj *val, robj *expire,
     // 执行覆盖写
     // 执行增量
     if(temp != NULL){
-        
+
+        if(temp->encoding == OBJ_ENCODING_INT){   
+            serverLog(LL_NOTICE, "the temp = %d", (long)temp->ptr);
+            serverLog(LL_NOTICE, "the error is the result of INT");
+            //char buf[32];
+            //ll2string(buf,32,(long)temp->ptr);
+            //serverLog(LL_NOTICE, "the temp = %s", buf);
+            serverLog(LL_NOTICE, "temp->encoding == OBJ_ENCODING_INT");
+        }
+
         serverLog(LL_NOTICE, "the temp is %s", (char*)temp -> ptr);
         serverLog(LL_NOTICE, "the value is %s", (char*)val -> ptr);
         char* a = (char*)val -> ptr;
@@ -139,13 +148,13 @@ void setGenericCommand(client *c, int flags, robj *key, robj *val, robj *expire,
                 b[i] ^= a[i];
             }
             serverLog(LL_NOTICE, "the char* b is %s", b);
-            feedParityXOR(b);
+            feedParityXOR(c, b);
         }else{
             for(int i = 0; i < lenA; i++){
                 a[i] ^= b[i];
             }
             serverLog(LL_NOTICE, "the char* a is %s", a);
-            feedParityXOR(a);
+            feedParityXOR(c, a);
         }
 
         
@@ -155,7 +164,7 @@ void setGenericCommand(client *c, int flags, robj *key, robj *val, robj *expire,
         // 在这里调用networking的函数
         
     }else{
-        feedParityARGV(c -> argc, c -> argv);
+        feedParityARGV(c, c -> argc, c -> argv);
     }
 # endif
     
@@ -211,7 +220,13 @@ void setCommand(client *c) {
     }
 
     c->argv[2] = tryObjectEncoding(c->argv[2]);
+# ifdef _ERASURE_CODE_
+    server.cntflag = 1;
+# endif
     setGenericCommand(c,flags,c->argv[1],c->argv[2],expire,unit,NULL,NULL);
+# ifdef _ERASURE_CODE_
+    server.cntflag = 0;
+# endif
 }
 
 void setnxCommand(client *c) {
