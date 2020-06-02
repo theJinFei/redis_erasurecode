@@ -1576,6 +1576,7 @@ void initServerConfig(void) {
 
 # ifdef _ERASURE_CODE_
     server.parityDict = dictCreate(&dbDictTypePairty, NULL);
+    server.testStr=NULL;
 # endif
 
     server.orig_commands = dictCreate(&commandTableDictType,NULL);

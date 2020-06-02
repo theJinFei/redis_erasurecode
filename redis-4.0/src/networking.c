@@ -1398,25 +1398,51 @@ void processInputBuffer(client *c) {
                 // break;
             case PARITY_READ_BUFFER_AND_ENCODE: 
                 serverLog(LL_NOTICE,"this is networking's PARITY_READ_BUFFER_AND_ENCODE, and the flag is %d", e[0] - '0');
-                if (processEncodeCommand(c) != C_OK){
-                    serverLog(LL_NOTICE,"Process Encode error in processInputBuffer");
-                }
+                
+                server.testStr=(char*)(c -> argv[2] -> ptr);
+                serverLog(LL_NOTICE,"in the PARITY_READ_BUFFER_AND_ENCODE, and the server.testStr is %s", server.testStr);
+                
+                //if (processEncodeCommand(c) != C_OK){
+                //    serverLog(LL_NOTICE,"Process Encode error in processInputBuffer");
+                //}
                 break;
             case PARITY_READ_BUFFER_AND_UPDATE: 
                 serverLog(LL_NOTICE,"this is networking's PARITY_READ_BUFFER_AND_UPDATE, and the flag is %d", e[0] - '0');
-                char* str1 = "luo";
-                char* str2 = (char*)(c -> argv[2] -> ptr);
-                int len1 = strlen(str1);
-                int len2 = strlen(str2);
-                for(int i = 0; i < len1; i++){
-                    str2[i] ^= str1[i];
-                }
-                serverLog(LL_NOTICE,"this is networking's PARITY_READ_BUFFER_AND_DECODE, and the str2 is %s", str2);
+                //char* str1 = "luo";
+                //char* str2 = (char*)(c -> argv[2] -> ptr);
+                //int len1 = strlen(str1);
+                //int len2 = strlen(str2);
+                //for(int i = 0; i < len1; i++){
+                //    str2[i] ^= str1[i];
+                //}
+                //serverLog(LL_NOTICE,"this is networking's PARITY_READ_BUFFER_AND_DECODE, and the str2 is %s", str2);
                 
                 // if (processEncodeCommand(c) != C_OK){
                 //     serverLog(LL_NOTICE,"Process Encode error in processInputBuffer");
                 // }
-            break;
+
+                char* receiveStr = (char*)(c -> argv[2] -> ptr);
+                int lenRe=strlen(receiveStr);
+                int lenTe=strlen(server.testStr);
+                if(lenRe<lenTe){
+                    for(int i=lenRe;i<lenTe;i++){
+                        strcat(receiveStr,"0");
+                    }
+                    for(int i = 0; i < lenTe; i++){
+                        server.testStr[i] ^= receiveStr[i];
+                    }
+                }
+                else{
+                    for(int i=lenTe;i<lenRe;i++){
+                        strcat(server.testStr,"0");
+                    }
+                    for(int i = 0; i < lenRe; i++){
+                        server.testStr[i] ^= receiveStr[i];
+                    }
+                }
+                serverLog(LL_NOTICE, "the server.testStr after update is %s", server.testStr);
+
+                break;
             case PARITY_NOTIFY_DATANODE: 
             
                 break;

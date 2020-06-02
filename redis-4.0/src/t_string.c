@@ -126,42 +126,35 @@ void setGenericCommand(client *c, int flags, robj *key, robj *val, robj *expire,
             serverLog(LL_NOTICE, "temp->encoding == OBJ_ENCODING_INT");
         }
 
-        serverLog(LL_NOTICE, "the temp is %s", (char*)temp -> ptr);
-        serverLog(LL_NOTICE, "the value is %s", (char*)val -> ptr);
-        char* a = (char*)val -> ptr;
-        char* b=  (char*)temp -> ptr;
-        int lenA = strlen(a);
-        int lenB = strlen(b);
-        // 先让其对齐 以后改
-        // if(lenA > lenB){
-        //     for(int i = 0; i < lenA - lenB; i++){
-        //         strcat(b, '0');
-        //     }
-        // }else{
-        //     for(int i = 0; i < lenB - lenA; i++){
-        //         strcat(a, '0');
-        //     }
-        // }
-        // funAlign(char* a, char* b)
-        if(lenA < lenB){
-            for(int i = 0; i < lenA; i++){
-                b[i] ^= a[i];
-            }
-            serverLog(LL_NOTICE, "the char* b is %s", b);
-            feedParityXOR(c, b);
-        }else{
-            for(int i = 0; i < lenA; i++){
-                a[i] ^= b[i];
-            }
-            serverLog(LL_NOTICE, "the char* a is %s", a);
-            feedParityXOR(c, a);
-        }
-
+        //char* a = (char*)val -> ptr;
+        //char* b=  (char*)temp -> ptr;
         
-        // serverLog(LL_NOTICE, "the char* a is %s", a);
-        // serverLog(LL_NOTICE, "the char* b is %s", b);
-        // char* parityXOR = *(char*)val -> ptr  ^ *(char*)temp -> ptr;    //把temp发送给校验节点
-        // 在这里调用networking的函数
+        int lenNew = strlen((char*)val -> ptr);//新value
+        int lenOld = strlen((char*)temp -> ptr);//旧value
+
+        char *newValue = (char *)malloc(lenNew*sizeof(char));
+        char *oldValue = (char *)malloc(lenOld*sizeof(char));
+
+        strcpy(newValue,(char*)val -> ptr);
+        strcpy(oldValue,(char*)temp -> ptr);
+
+        serverLog(LL_NOTICE, "the newValue is %s", newValue);
+        serverLog(LL_NOTICE, "the oldValue is %s", oldValue);
+
+
+        if(lenNew < lenOld){
+            for(int i = 0; i < lenNew; i++){
+                oldValue[i] ^= newValue[i];
+            }
+            serverLog(LL_NOTICE, "the oldValue after XOR is %s", oldValue);
+            feedParityXOR(c, oldValue);
+        }else{
+            for(int i = 0; i < lenOld; i++){
+                newValue[i] ^= oldValue[i];
+            }
+            serverLog(LL_NOTICE, "the newValue after XOR is %s", newValue);
+            feedParityXOR(c, newValue);
+        }
         
     }else{
         feedParityARGV(c, c -> argc, c -> argv);

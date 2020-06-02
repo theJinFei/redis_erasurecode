@@ -1007,6 +1007,7 @@ struct redisServer {
 # ifdef _ERASURE_CODE_
     long long stat_numsetcommands;     /* Number of processed set commands */
     int cntflag;
+    char *testStr;
 # endif
 
     long long stat_numconnections;  /* Number of connections received */
