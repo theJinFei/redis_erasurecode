@@ -282,8 +282,6 @@ int dictAdd(dict *d, void *key, void *val)
     dictEntry *entry = dictAddRaw(d,key,NULL);  
     
 #ifdef _ERASURE_CODE_
-//   serverLog(LL_NOTICE, "in the dictAdd, test running state");
-//   entry -> stat_set_commands = server.stat_numsetcommands;
     if(server.cntflag == 1){
         entry->stat_set_commands = server.stat_numsetcommands;
         serverLog(LL_NOTICE, "in the dictAdd, the entry->stat_set_commands = %d", entry->stat_set_commands);
@@ -295,6 +293,18 @@ int dictAdd(dict *d, void *key, void *val)
     dictSetVal(d, entry, val);
     return DICT_OK;
 }
+
+#ifdef _ERASURE_CODE_
+int dictAddParity(dict *d, void *cnt, void *key, void *val){
+    dictEntry *entry = dictAddRawParity(d,cnt,NULL);  
+
+    if (!entry) return DICT_ERR;
+
+    dictSetKey(d, entry, key);
+    dictSetVal(d, entry, val);
+    return DICT_OK;
+}
+#endif
 
 #ifdef USE_PMDK
 /* Add an element to the target hash table */
@@ -360,6 +370,36 @@ dictEntry *dictAddRaw(dict *d, void *key, dictEntry **existing)
     dictSetKey(d, entry, key);
     return entry;
 }
+
+#ifdef _ERASURE_CODE_
+dictEntry *dictAddRawParity(dict *d, void *cnt, dictEntry **existing){
+    long index;
+    dictEntry *entry;
+    dictht *ht;
+
+    if (dictIsRehashing(d)) _dictRehashStep(d);
+
+    /* Get the index of the new element, or -1 if
+     * the element already exists. */
+    if ((index = _dictKeyIndex(d, cnt, dictHashKey(d,cnt), existing)) == -1)
+        return NULL;
+
+    /* Allocate the memory and store the new entry.
+     * Insert the element in top, with the assumption that in a database
+     * system it is more likely that recently added entries are accessed
+     * more frequently. */
+    ht = dictIsRehashing(d) ? &d->ht[1] : &d->ht[0];
+    entry = zmalloc(sizeof(*entry));
+
+    entry->next = ht->table[index];
+    ht->table[index] = entry;
+    ht->used++;
+
+    /* Set the hash entry fields. */
+    dictSetCnt(d, entry, cnt);
+    return entry;
+}
+#endif
 
 #ifdef USE_PMDK
 /* Low level add. This function adds the entry but instead of setting
@@ -644,6 +684,12 @@ dictEntry *dictFind(dict *d, const void *key)
     }
     return NULL;
 }
+
+#ifdef _ERASURE_CODE_
+dictEntry *dictFindParity(dict *d, const void *cnt){
+
+}
+#endif
 
 void *dictFetchValue(dict *d, const void *key) {
     dictEntry *he;

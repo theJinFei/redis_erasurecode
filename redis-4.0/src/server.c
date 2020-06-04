@@ -1577,6 +1577,7 @@ void initServerConfig(void) {
 # ifdef _ERASURE_CODE_
     server.parityDict = dictCreate(&dbDictTypePairty, NULL);
     server.testStr=NULL;
+    //server.parityValue=NULL;
 # endif
 
     server.orig_commands = dictCreate(&commandTableDictType,NULL);
@@ -2711,35 +2712,29 @@ int processCommand(client *c) {
 #ifdef _ERASURE_CODE_
 // 将收到的消息写入校验节点 应该把key value插入到hash表中
 int processEncodeCommand(client *c){
-    serverLog(LL_NOTICE,"the inputbuffer has already split ...");
+    serverLog(LL_NOTICE,"in the processEncodeCommand");
     int j;
     for(j = 0; j < c -> argc; j++){
         robj* o = c -> argv[j];
         serverLog(LL_NOTICE,"the obj is %s", (char*)(o -> ptr));
     }
-    // 需要做一次判断 是否命令个数
-    dictEntry *entry = malloc(sizeof(*entry));
 
-    // 进行赋值
-    entry -> key = c -> argv[1];
-    entry -> v.val = c -> argv[2];
-    entry -> stat_set_commands = c -> argv[4];
+    //db = c->db;
+    //dict = c->db->dict;
+    //key = c->agrv[1];
+    //val = c->agrv[2];
+    //cnt = c->argv[4];
 
-    // if(c -> argc[3] == PARITY_READ_BUFFER_AND_UPDATE){  // 说明已经有了
-
-    // }else{
-
-    // }
-    dictEntry* temp;
-    // 如果为空，证明是编码过程直接插入即可
-    if(temp = dictFind(server.parityDict, entry -> stat_set_commands) == NULL){
-        // dictAdd(server.parityDict, entry -> stat_set_commands, entry);
-
-    }else{
-        // entry -> v.val ^= temp -> v.val; // 否则，说明是更新过程，取出相应的值，做一下异或操作，替换
-        // dictReplace(server.parityDict, entry -> stat_set_commands, entry);
+    if (dictFind(c->db->dict,c->argv[4]->ptr) == NULL) {
+        //全新的cnt，向hash表中插入key,val,cnt
+        serverLog(LL_NOTICE,"dictFind is NULL");
+        dbAddParity(c->db,c->argv[1],c->argv[2],c->argv[4]);
+    } else {
+        //已经有过的cnt
+        //另一个data node的同cnt命令，做校验后插入
+        //同一个data node的同cnt命令的更新，异或更新增量后插入
+        //dbOverwrite(db,key,val);
     }
-
 
     return C_OK;
 }

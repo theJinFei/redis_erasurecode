@@ -366,6 +366,7 @@ void feedParityARGV(client *cl, const int argc, robj** argv){
     }
 
 }
+
 void feedParityXOR(client* cl, const char* parityXOR)
 {
     // 把这个XOR增量进行发送即可
@@ -438,178 +439,59 @@ void feedParityXOR(client* cl, const char* parityXOR)
     }
 }
 
-// void replicationFeedParitys(const char* hostip, const uint16_t port, int argc, robj** argv){
-
-//     // 要发送的命令
-//     int j;
-//     for (j = 0; j < argc; j++) {
-//         robj* o = getDecodedObject(argv[j]);
-//         /* redis log*/
-//         serverLog(LL_NOTICE, "this is replication.c and the command of split is %.40s", (char*)o -> ptr);
-//     }
-//     serverLog(LL_NOTICE, "the hostip is %s, the server.port is %d and the port is %d", hostip, server.port, port);
-//      // 保证这个只执行一遍
-//     if(server.port != port){
-
-//         redisContext *c = redisConnect(hostip, port);
-//         if (c == NULL || c->err) {
-//             if (c) {
-//                 serverLog(LL_NOTICE, "Error: %.40s", c->errstr);
-//             } else {
-//                 serverLog(LL_NOTICE, "Can't allocate redis context");
-//             }
-//         }
-
-
-//         redisReply *reply = NULL;
-//         // 需要添加非set命令 如果那边解析到了
-//         /*添加命令set */
-//         redisAppendCommand(c,"set foo2 bar2");
-//         /*添加命令get */
-//         // redisAppendCommand(c,"GET foo");
-//         /*获取set命令结果*/
-//         redisGetReply(c,&reply); // reply for SET
-//         serverLog(LL_NOTICE, "c -> obuf is %.40s",reply -> str);
+void feedParityXORLen(client *cl, const char* parityXOR, int len){
+    // 把这个XOR增量进行发送即可
+    const char* parityip = "127.0.0.1";
+    const uint16_t port = 7002;
+    // 保证这个只执行一遍
+    serverLog(LL_NOTICE, "the server.port is %d and the port is %d", server.port, port);
+    if(server.port != port && !(server.cluster -> myself -> flags & CLUSTER_NODE_SLAVE)){ 
+        serverLog(LL_NOTICE, "the flags is  %d and the CLUSTER_NODE_SLAVE is %d", server.cluster -> myself -> flags, CLUSTER_NODE_SLAVE);
         
-//         freeReplyObject(reply);
-//         // /*获取get命令结果*/
-//         // redisGetReply(c,&reply); // reply for GET
-
-
-//         // freeReplyObject(reply);
-//         redisFree(c);
-//         // redisAppendCommandArgv
-//     }
-// }
-
-// // 新增传送给校验节点的
-
-// //
-
-// /////// 这个函数无用
-
-// ///
-// void replicationFeedParity(clusterNode* node, int dictid, robj **argv, int argc) {
-//     serverLog(LL_NOTICE, "the node name is %s, ip is %.40s, the port is %d, the cport is %d", (char*)node -> name, (char*)node -> ip, node -> port, node -> cport);
-
-//     int j;
-//     for (j = 0; j < argc; j++) {
-//         robj* o = getDecodedObject(argv[j]);
-//         /* redis log*/
-//         serverLog(LL_NOTICE, "this is robj and the command of split is %.40s", (char*)o -> ptr);
-//     }
-
-
-
-//     clusterLink* link = node -> link;
-//     char* msg = "set name luo";
-//     int msglen = strlen(msg);
-//     // if (sdslen(link->sndbuf) == 0 && msglen != 0)
-//     //     aeCreateFileEvent(server.el,link->fd,AE_WRITABLE|AE_BARRIER,
-//     //                 clusterWriteHandler,link);
-
-//     link->sndbuf = sdscatlen(link->sndbuf, msg, msglen);
-
-//     // if (clusterProcessPacket(link)) {
-//     //     serverLog
-//     //     sdsfree(link->rcvbuf);
-//     //     link->rcvbuf = sdsempty();
-//     // } else {
-//     //     return; /* Link no longer valid. */
-//     // }
-
-//     // if (aeCreateFileEvent(server.el, link -> fd, AE_READABLE, clusterAcceptHandler, NULL) == AE_ERR)
-//     //     serverLog(LL_NOTICE, "the file of read is failed ");
-//     //     // serverPanic("Unrecoverable error creating Redis Cluster "
-//     //      //            "file event.");
+        serverLog(LL_NOTICE, "after feedParityXORLen, the hostip is %s, the server.port is %d and the port is %d", server.bindaddr, server.port, port);
+        redisContext *c = redisConnect(parityip, port);
+        if (c == NULL || c->err) {
+            if (c) {
+                serverLog(LL_NOTICE, "Error: %.40s", c->errstr);
+            } else {
+                serverLog(LL_NOTICE, "Can't allocate redis context");
+            }
+        }
     
-//     // // 找到校验节点这个client
-//     // listNode *ln;
-//     // listIter li;
-//     // client *c = NULL;
-//     // listRewind(server.clients,&li);
-//     // while ((ln = listNext(&li)) != NULL) {
-//     //     client* temp = listNodeValue(ln); // 找到这个parity client
-//     //     // c  = listNodeValue(ln);
-//     //     serverLog(LL_NOTICE, "this is replicaiton and the client ip is %s, the port is %d", temp -> slave_ip[0], temp -> slave_listening_port);
-//     //     if(strcasecmp(temp -> slave_ip, node -> ip) == 0 && temp -> slave_listening_port == node -> port){
-//     //         serverLog(LL_NOTICE, "we find it ! and the port is %s", temp -> slave_ip);
-//     //         // c = createClient(temp -> fd);
-//     //         break;
-//     //     }
-//     //     // if(strcasecmp(c -> slave_ip, node -> ip) == 0 && c -> slave_listening_port == node -> port){
-//     //     //     serverLog(LL_NOTICE, "we find it ! the client ip is %s and the port is %s", c -> slave_ip);
-//     //     //     // c = createClient(temp -> fd);
-//     //     //     break;
-//     //     // }
-//     // }
-//     // if(c == NULL){
-//     //     serverLog(LL_NOTICE, "this is replicaiton and the client is NULL, and we don't find pairty client");
-//     //     return;
-//     // }else{
-//     //     serverLog(LL_NOTICE, "this is replicaiton and the find client ip is %s and the port is %d", c -> slave_ip, c -> slave_listening_port);
-//     // }
-
-//     // // client* c = createClient(-1);;
-//     // // c -> slave_listening_port = node -> port;
-//     // // strcpy(c -> slave_ip, node -> ip);
-//     // // c -> slave_ip = node -> ip;
-
-//     // %.4s
-//     // for (j = 0; j < argc; j++){ // 不需要发送set 这个obj
-//     //     argv[j] -> flag = PARITY_READ_BUFFER_AND_ENCODE;
-//     //     // addReplyString(c, (char*)argv[j] -> ptr, strlen((char*)argv[j] -> ptr));
-//     //     addReplyBulk(c, argv[j]);
-//     //     serverLog(LL_NOTICE, "the robj has sended, the obj is %s", (char*)argv[j] -> ptr);
-//     // }  
-
-//     // /* redis log*/
-//     // serverLog(LL_NOTICE, "this is replicationFeedParity and the node name is %s",(char*)node->name);
-
-// #ifdef _ERASURE_CODE_
-
-//     // client 对象 需要创建是哪个服务器的客户端吗
-//     // 需要先找到master的文件描述符
-//     // 其他master也是一个客户端？
-//     // 客户端链接生成一个fd
-//     // 可能会有多个校验节点
-//     // server.paritys = listCreate();
-//     // client* c = createClient(-1);
-//     // c->slave_listening_port = 7002;
-//     // strcpy(c -> slave_ip, "127.0.0.1");
-//     // listAddNodeHead(server.paritys, c);
-
-//     // listIter li;
-//     // listNode *ln;
-//     // // int processed = listLength(server.paritys);
-
-//     // listRewind(server.paritys,&li);
-//     // while((ln = listNext(&li))) {
-//     //     client *c = listNodeValue(ln);  
-//     //     serverLog(LL_NOTICE, "the client c -> name is %s", (char*)c -> name);   // null
-//     // }
-//     // for (j = 1; j < argc; j++){ // 不需要发送set 这个obj
-//     //      // addReplyString(c, (char*)argv[j] -> ptr, strlen((char*)argv[j] -> ptr));
-//     //      addReplyBulk(c, argv[j]);
-//     //      // serverLog(LL_NOTICE, "the robj has sended, the obj is %s", (char*)argv[j] -> ptr);
-//     // }  
-
-//     // client* c = createClient();   // 创建一个伪客户端
-//     // c->slave_listening_port = 7002;
-//     // strcpy(c -> slave_ip, "127.0.0.1");
-
-//     // /* Finally any additional argument that was not stored inside the
-//     //      * static buffer if any (from j to argc). */
-//     // for (j = 0; j < argc; j++){
-//     //      addReplyString(c, (char*)argv[j] -> ptr, strlen((char*)argv[j] -> ptr));
-//     //      serverLog(LL_NOTICE, "the robj has sended, the obj is %s, and the len is %d", (char*)argv[j] -> ptr, (int)strlen((char*)argv[j] -> ptr));
-//     // }  // 不需要发送set 这个obj
-//     // addReplyBulk(c,argv[j]);
-
-// # endif
+        redisReply *reply = NULL;
 
 
-// }
+        // 需要添加非set命令 如果那边解析到了
+        /*添加命令set */
+
+        int argc = 5;
+        
+        char flag[32];
+        ll2string(flag,32,(long)PARITY_READ_BUFFER_AND_UPDATE);
+
+        char cnt[32];
+        dictEntry *entry = dictFind(cl->db->dict, cl->argv[1]->ptr);
+        serverLog(LL_NOTICE, "in the feedParityXORLen, the entry->stat_set_commands = %d", entry->stat_set_commands);
+        ll2string(cnt,32,entry->stat_set_commands);
+
+        char *argv[]={"set","key",parityXOR,flag,cnt};
+        size_t argvlen[]={3,3,len,strlen(flag),strlen(cnt)};
+
+        serverLog(LL_NOTICE, "in the feedParityXORLen, the len of parityXOR = %d", len);
+        serverLog(LL_NOTICE, "in the feedParityXORLen, the len of flag = %d", strlen(flag));
+        serverLog(LL_NOTICE, "in the feedParityXORLen, the len of cnt = %d", strlen(cnt));
+
+
+        redisAppendCommandArgv(c,argc,argv,argvlen);
+
+        /*获取set命令结果*/
+        redisGetReply(c,&reply); // reply for SET
+        serverLog(LL_NOTICE, "the reply is %s", reply -> str);
+        freeReplyObject(reply);
+        redisFree(c);
+    }
+}
+
 # endif
 
 

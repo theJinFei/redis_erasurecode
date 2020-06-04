@@ -1366,8 +1366,10 @@ void processInputBuffer(client *c) {
         }
 
         if (c->reqtype == PROTO_REQ_INLINE) {
+            serverLog(LL_NOTICE,"processInlineBuffer");
             if (processInlineBuffer(c) != C_OK) break;
         } else if (c->reqtype == PROTO_REQ_MULTIBULK) {
+            serverLog(LL_NOTICE,"processMultibulkBuffer");
             if (processMultibulkBuffer(c) != C_OK) break;
         } else {
             serverPanic("Unknown request type");
@@ -1391,6 +1393,12 @@ void processInputBuffer(client *c) {
             char* e = (char *)(getDecodedObject(c -> argv[3]) -> ptr);
             serverLog(LL_NOTICE,"the e is %s", e);
 
+            char* diff = (char *)(c -> argv[2] -> ptr);
+            serverLog(LL_NOTICE,"the diff is %s",diff);
+            for(int i=0;i<strlen(diff);i++){
+                serverLog(LL_NOTICE, "the NO.%d diff is %d", i, (int)diff[i]);
+            }
+
             switch(e[0] - '0'){
             case PARITY_NORMAL_PROCESS: 
                 // donothing;
@@ -1402,46 +1410,57 @@ void processInputBuffer(client *c) {
                 server.testStr=(char*)(c -> argv[2] -> ptr);
                 serverLog(LL_NOTICE,"in the PARITY_READ_BUFFER_AND_ENCODE, and the server.testStr is %s", server.testStr);
                 
-                //if (processEncodeCommand(c) != C_OK){
-                //    serverLog(LL_NOTICE,"Process Encode error in processInputBuffer");
-                //}
-                break;
-            case PARITY_READ_BUFFER_AND_UPDATE: 
-                serverLog(LL_NOTICE,"this is networking's PARITY_READ_BUFFER_AND_UPDATE, and the flag is %d", e[0] - '0');
-                //char* str1 = "luo";
-                //char* str2 = (char*)(c -> argv[2] -> ptr);
-                //int len1 = strlen(str1);
-                //int len2 = strlen(str2);
-                //for(int i = 0; i < len1; i++){
-                //    str2[i] ^= str1[i];
-                //}
-                //serverLog(LL_NOTICE,"this is networking's PARITY_READ_BUFFER_AND_DECODE, and the str2 is %s", str2);
-                
                 // if (processEncodeCommand(c) != C_OK){
                 //     serverLog(LL_NOTICE,"Process Encode error in processInputBuffer");
                 // }
+                // else{
+                //     dictEntry *tmp = dictFind(c->db->dict,c->argv[4]->ptr);
+                //     if(tmp!=NULL){
+                //         serverLog(LL_NOTICE,"processEncodeCommand is OK, and the Entry:");
+                //         // serverLog(LL_NOTICE,"Entry->cnt: %d",tmp->stat_set_commands);
+                //         // serverLog(LL_NOTICE,"Entry->key: %s", (tmp->key));
+                //         // serverLog(LL_NOTICE,"Entry->val: %s", (tmp->v));
+                //     }
+                //     else{
+                //         serverLog(LL_NOTICE,"The entry is empty");
+                //     }       
+                // }
+                break;
+            case PARITY_READ_BUFFER_AND_UPDATE: 
+                serverLog(LL_NOTICE,"this is networking's PARITY_READ_BUFFER_AND_UPDATE, and the flag is %d", e[0] - '0');
 
                 char* receiveStr = (char*)(c -> argv[2] -> ptr);
+
+                FILE *fp;
+                fp = fopen("/home/gengyj/testredis/tmp/receiveStr.bin","wb+");
+                fprintf(fp,receiveStr);
+                fclose(fp);
+
+                serverLog(LL_NOTICE,"the receiveStr is %s",receiveStr);
+                for(int i=0;i<strlen(receiveStr);i++){
+                    serverLog(LL_NOTICE, "the NO.%d receiveStr is %d", i, (int)receiveStr[i]);
+                }
+
                 int lenRe=strlen(receiveStr);
                 int lenTe=strlen(server.testStr);
-                if(lenRe<lenTe){
-                    for(int i=lenRe;i<lenTe;i++){
-                        strcat(receiveStr,"0");
-                    }
-                    for(int i = 0; i < lenTe; i++){
-                        server.testStr[i] ^= receiveStr[i];
-                    }
-                }
-                else{
-                    for(int i=lenTe;i<lenRe;i++){
-                        strcat(server.testStr,"0");
-                    }
-                    for(int i = 0; i < lenRe; i++){
-                        server.testStr[i] ^= receiveStr[i];
-                    }
-                }
-                serverLog(LL_NOTICE, "the server.testStr after update is %s", server.testStr);
 
+                int lentmp = (lenRe>lenTe)?lenRe:lenTe;
+
+                char *tmpValue = (char *)malloc(lentmp*sizeof(char));
+                memset(tmpValue,0,(sizeof(char))*lentmp);
+
+                for(int i = 0; i < lenRe; i++){
+                    tmpValue[i] ^= receiveStr[i];
+                }
+                for(int i = 0; i < lenTe; i++){
+                    tmpValue[i] ^= server.testStr[i];
+                }
+
+                server.testStr = tmpValue;
+
+                serverLog(LL_NOTICE, "the tmpValue after update is %s", tmpValue);
+                serverLog(LL_NOTICE, "the server.testStr after update is %s", server.testStr);
+                
                 break;
             case PARITY_NOTIFY_DATANODE: 
             

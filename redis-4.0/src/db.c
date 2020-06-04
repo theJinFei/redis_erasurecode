@@ -178,6 +178,14 @@ void dbAdd(redisDb *db, robj *key, robj *val) {
     if (server.cluster_enabled) slotToKeyAdd(key);
  }
 
+#ifdef _ERASURE_CODE_
+void dbAddParity(redisDb *db, robj *key, robj *val, robj *cnt){
+    sds copy = sdsdup(cnt->ptr);
+    int retval = dictAddParity(db->dict, copy, key, val);
+}
+#endif
+
+
 #ifdef USE_PMDK
 /*
  * Add the key to the DB using libpmemobj transactions.

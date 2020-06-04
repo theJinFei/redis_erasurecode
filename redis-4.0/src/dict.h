@@ -61,6 +61,7 @@ typedef struct dictEntry {
     struct dictEntry *next;
 #ifdef _ERASURE_CODE_
     long long stat_set_commands;
+    //void *stat_set_commands;
 #endif
 
 } dictEntry;
@@ -142,6 +143,12 @@ typedef void (dictScanBucketFunction)(void *privdata, dictEntry **bucketref);
         (entry)->key = (_key_); \
 } while(0)
 
+//# ifdef _ERASURE_CODE
+#define dictSetCnt(d, entry, _cnt_) do { \
+    (entry)->stat_set_commands = (long long)(_cnt_); \
+} while(0)
+//# endif
+
 #define dictCompareKeys(d, key1, key2) \
     (((d)->type->keyCompare) ? \
         (d)->type->keyCompare((d)->privdata, key1, key2) : \
@@ -161,6 +168,13 @@ typedef void (dictScanBucketFunction)(void *privdata, dictEntry **bucketref);
 dict *dictCreate(dictType *type, void *privDataPtr);
 int dictExpand(dict *d, unsigned long size);
 int dictAdd(dict *d, void *key, void *val);
+
+# ifdef _ERASURE_CODE_
+int dictAddParity(dict *d, void *cnt, void *key, void *val);
+dictEntry *dictAddRawParity(dict *d, void *cnt, dictEntry **existing);
+dictEntry *dictFindParity(dict *d, void *cnt);
+# endif
+
 dictEntry *dictAddRaw(dict *d, void *key, dictEntry **existing);
 dictEntry *dictAddOrFind(dict *d, void *key);
 int dictReplace(dict *d, void *key, void *val);

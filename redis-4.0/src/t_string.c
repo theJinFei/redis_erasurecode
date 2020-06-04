@@ -120,14 +120,8 @@ void setGenericCommand(client *c, int flags, robj *key, robj *val, robj *expire,
         if(temp->encoding == OBJ_ENCODING_INT){   
             serverLog(LL_NOTICE, "the temp = %d", (long)temp->ptr);
             serverLog(LL_NOTICE, "the error is the result of INT");
-            //char buf[32];
-            //ll2string(buf,32,(long)temp->ptr);
-            //serverLog(LL_NOTICE, "the temp = %s", buf);
             serverLog(LL_NOTICE, "temp->encoding == OBJ_ENCODING_INT");
         }
-
-        //char* a = (char*)val -> ptr;
-        //char* b=  (char*)temp -> ptr;
         
         int lenNew = strlen((char*)val -> ptr);//新value
         int lenOld = strlen((char*)temp -> ptr);//旧value
@@ -141,20 +135,31 @@ void setGenericCommand(client *c, int flags, robj *key, robj *val, robj *expire,
         serverLog(LL_NOTICE, "the newValue is %s", newValue);
         serverLog(LL_NOTICE, "the oldValue is %s", oldValue);
 
-
-        if(lenNew < lenOld){
-            for(int i = 0; i < lenNew; i++){
-                oldValue[i] ^= newValue[i];
-            }
-            serverLog(LL_NOTICE, "the oldValue after XOR is %s", oldValue);
-            feedParityXOR(c, oldValue);
-        }else{
-            for(int i = 0; i < lenOld; i++){
-                newValue[i] ^= oldValue[i];
-            }
-            serverLog(LL_NOTICE, "the newValue after XOR is %s", newValue);
-            feedParityXOR(c, newValue);
+        int lentmp = (lenNew>lenOld)?lenNew:lenOld;
+        char *tmpValue = (char *)malloc(lentmp*sizeof(char));
+        memset(tmpValue,0,(sizeof(char))*lentmp);
+        
+        for(int i = 0; i < lenNew; i++){
+            tmpValue[i] ^= newValue[i];
         }
+        for(int i = 0; i < lenOld; i++){
+            tmpValue[i] ^= oldValue[i];
+        }
+
+        serverLog(LL_NOTICE, "the tmpValue after XOR is %s", tmpValue);
+        for(int i=0;i<lentmp;i++){
+            serverLog(LL_NOTICE, "the NO.%d tmpValue after XOR is %d", i, (int)tmpValue[i]);
+        }
+        
+
+        FILE *fp;
+        fp = fopen("/home/gengyj/testredis/tmp/tmpValue.bin","wb+");
+        fprintf(fp,tmpValue);
+        fclose(fp);
+
+
+        //feedParityXOR(c, tmpValue);
+        feedParityXORLen(c,tmpValue,lentmp);
         
     }else{
         feedParityARGV(c, c -> argc, c -> argv);

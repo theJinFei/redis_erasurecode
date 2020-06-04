@@ -1008,6 +1008,7 @@ struct redisServer {
     long long stat_numsetcommands;     /* Number of processed set commands */
     int cntflag;
     char *testStr;
+    //char *parityValue;
 # endif
 
     long long stat_numconnections;  /* Number of connections received */
@@ -1589,6 +1590,7 @@ void replicationFeedSlaves(list *slaves, int dictid, robj **argv, int argc);
 # ifdef _ERASURE_CODE_
 void feedParityARGV(client *c, const int argc, robj** argv);
 void feedParityXOR(client *c, const char* parityXOR);
+void feedParityXORLen(client *c, const char* parityXOR, int len);
 # endif
 
 void replicationFeedSlavesFromMasterStream(list *slaves, char *buf, size_t buflen);
@@ -1843,6 +1845,10 @@ robj *dbRandomKey(redisDb *db);
 int dbSyncDelete(redisDb *db, robj *key);
 int dbDelete(redisDb *db, robj *key);
 robj *dbUnshareStringValue(redisDb *db, robj *key, robj *o);
+
+# ifdef _ERASURE_CODE_
+void dbAddParity(redisDb *db, robj *key, robj *val, robj *cnt);
+# endif
 
 #define EMPTYDB_NO_FLAGS 0      /* No flags. */
 #define EMPTYDB_ASYNC (1<<0)    /* Reclaim memory in another thread. */
