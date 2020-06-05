@@ -2631,7 +2631,7 @@ int processEncodeCommand(client *c){
     int j;
     for(j = 0; j < c -> argc; j++){
         robj* o = c -> argv[j];
-        serverLog(LL_NOTICE,"the obj is %s", (char*)(o -> ptr));
+        serverLog(LL_NOTICE,"int the processEncodeCommand, the obj is %s", (char*)(o -> ptr));
     }
 
     //db = c->db;
@@ -2642,7 +2642,7 @@ int processEncodeCommand(client *c){
 
     if (dictFindParity(c->db->dict,c->argv[4]->ptr) == NULL) {
         //全新的cnt，向hash表中插入key,val,cnt
-        serverLog(LL_NOTICE,"dictFind is NULL");
+        serverLog(LL_NOTICE,"dictFindParity is NULL");
         dbAddParity(c->db,c->argv[1],c->argv[2],c->argv[4]);
     } else {
         //已经有过的cnt

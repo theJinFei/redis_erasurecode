@@ -84,6 +84,10 @@ static unsigned long _dictNextPower(unsigned long size);
 static long _dictKeyIndex(dict *ht, const void *key, uint64_t hash, dictEntry **existing);
 static int _dictInit(dict *ht, dictType *type, void *privDataPtr);
 
+# ifdef _ERASURE_CODE_
+static long _dictKeyIndexParity(dict *d, const void *cnt, uint64_t hash, dictEntry **existing);
+# endif
+
 /* -------------------------- hash functions -------------------------------- */
 
 static uint8_t dict_hash_function_seed[16];
@@ -288,7 +292,6 @@ int dictAdd(dict *d, void *key, void *val)
         entry->stat_set_commands = tmpCnt;
         serverLog(LL_NOTICE, "in the dictAdd, the entry->stat_set_commands = %d", *(int *)(entry->stat_set_commands));
     }
-    
 #endif
 
     if (!entry) return DICT_ERR;
@@ -378,7 +381,7 @@ dictEntry *dictAddRawParity(dict *d, void *cnt, dictEntry **existing){
 
     /* Get the index of the new element, or -1 if
      * the element already exists. */
-    if ((index = _dictKeyIndex(d, cnt, dictHashKey(d,cnt), existing)) == -1)
+    if ((index = _dictKeyIndexParity(d, cnt, dictHashKey(d,cnt), existing)) == -1)
         return NULL;
 
     /* Allocate the memory and store the new entry.
@@ -684,7 +687,23 @@ dictEntry *dictFind(dict *d, const void *key)
 
 #ifdef _ERASURE_CODE_
 dictEntry *dictFindParity(dict *d, const void *cnt){
+    dictEntry *he;
+    uint64_t h, idx, table;
 
+    if (d->ht[0].used + d->ht[1].used == 0) return NULL; /* dict is empty */
+    if (dictIsRehashing(d)) _dictRehashStep(d);
+    h = dictHashKey(d, cnt);
+    for (table = 0; table <= 1; table++) {
+        idx = h & d->ht[table].sizemask;
+        he = d->ht[table].table[idx];
+        while(he) {
+            if (cnt==he->stat_set_commands || dictCompareKeys(d, cnt, he->stat_set_commands))
+                return he;
+            he = he->next;
+        }
+        if (!dictIsRehashing(d)) return NULL;
+    }
+    return NULL;
 }
 #endif
 
@@ -1176,6 +1195,33 @@ static long _dictKeyIndex(dict *d, const void *key, uint64_t hash, dictEntry **e
     }
     return idx;
 }
+
+#ifdef _ERASURE_CODE_
+static long _dictKeyIndexParity(dict *d, const void *cnt, uint64_t hash, dictEntry **existing)
+{
+    unsigned long idx, table;
+    dictEntry *he;
+    if (existing) *existing = NULL;
+
+    /* Expand the hash table if needed */
+    if (_dictExpandIfNeeded(d) == DICT_ERR)
+        return -1;
+    for (table = 0; table <= 1; table++) {
+        idx = hash & d->ht[table].sizemask;
+        /* Search if this slot does not already contain the given key */
+        he = d->ht[table].table[idx];
+        while(he) {
+            if (cnt==he->stat_set_commands || dictCompareKeys(d, cnt, he->stat_set_commands)) {
+                if (existing) *existing = he;
+                return -1;
+            }
+            he = he->next;
+        }
+        if (!dictIsRehashing(d)) break;
+    }
+    return idx;
+}
+#endif
 
 void dictEmpty(dict *d, void(callback)(void*)) {
     _dictClear(d,&d->ht[0],callback);

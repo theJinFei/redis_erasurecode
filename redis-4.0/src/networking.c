@@ -1410,21 +1410,29 @@ void processInputBuffer(client *c) {
                 server.testStr=(char*)(c -> argv[2] -> ptr);
                 serverLog(LL_NOTICE,"in the PARITY_READ_BUFFER_AND_ENCODE, and the server.testStr is %s", server.testStr);
                 
-                // if (processEncodeCommand(c) != C_OK){
-                //     serverLog(LL_NOTICE,"Process Encode error in processInputBuffer");
-                // }
-                // else{
-                //     dictEntry *tmp = dictFind(c->db->dict,c->argv[4]->ptr);
-                //     if(tmp!=NULL){
-                //         serverLog(LL_NOTICE,"processEncodeCommand is OK, and the Entry:");
-                //         // serverLog(LL_NOTICE,"Entry->cnt: %d",tmp->stat_set_commands);
-                //         // serverLog(LL_NOTICE,"Entry->key: %s", (tmp->key));
-                //         // serverLog(LL_NOTICE,"Entry->val: %s", (tmp->v));
-                //     }
-                //     else{
-                //         serverLog(LL_NOTICE,"The entry is empty");
-                //     }       
-                // }
+                if (processEncodeCommand(c) != C_OK){
+                    serverLog(LL_NOTICE,"Process Encode error in processInputBuffer");
+                }
+                else{
+                    dictEntry *tmp = dictFindParity(c->db->dict,c->argv[4]->ptr);
+                    if(tmp!=NULL){
+                        serverLog(LL_NOTICE,"processEncodeCommand is OK, and the Entry:");
+                        serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmp->stat_set_commands);
+
+                        //int tmpLen = strlen((char*)tmp->key);
+                        //char *tmpKey = (char *)malloc(tmpLen*sizeof(char));
+                        //strcpy(tmpKey,(char *)tmp->key);
+                        serverLog(LL_NOTICE,"Entry->key: %s", (char*)tmp->key);
+
+                        //tmpLen = strlen((char*)tmp->v);
+                        //char *tmpV = (char *)malloc(tmpLen*sizeof(char));
+                        //strcpy(tmpV,(char *)tmp->v);
+                        serverLog(LL_NOTICE,"Entry->val: %s", (char*)tmp->v.val);
+                    }
+                    else{
+                        serverLog(LL_NOTICE,"The entry is empty");
+                    }       
+                }
                 break;
             case PARITY_READ_BUFFER_AND_UPDATE: 
                 serverLog(LL_NOTICE,"this is networking's PARITY_READ_BUFFER_AND_UPDATE, and the flag is %d", e[0] - '0');

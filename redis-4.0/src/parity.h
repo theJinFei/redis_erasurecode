@@ -39,7 +39,7 @@
 # define PARITY_NORMAL_PROCESS 0   // 正常过程
 
 // ENCODE
-# define PARITY_READ_BUFFER_AND_ENCODE 1   // 编码过程
+# define PARITY_READ_BUFFER_AND_ENCODE 9   // 编码过程
 
 # define PARITY_READ_BUFFER_AND_UPDATE 2
 
