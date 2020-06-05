@@ -283,8 +283,10 @@ int dictAdd(dict *d, void *key, void *val)
     
 #ifdef _ERASURE_CODE_
     if(server.cntflag == 1){
-        entry->stat_set_commands = server.stat_numsetcommands;
-        serverLog(LL_NOTICE, "in the dictAdd, the entry->stat_set_commands = %d", entry->stat_set_commands);
+        int * tmpCnt = (int *)malloc(server.stat_numsetcommands*sizeof(int));
+        * tmpCnt = server.stat_numsetcommands;
+        entry->stat_set_commands = tmpCnt;
+        serverLog(LL_NOTICE, "in the dictAdd, the entry->stat_set_commands = %d", *(int *)(entry->stat_set_commands));
     }
     
 #endif
@@ -356,11 +358,6 @@ dictEntry *dictAddRaw(dict *d, void *key, dictEntry **existing)
      * more frequently. */
     ht = dictIsRehashing(d) ? &d->ht[1] : &d->ht[0];
     entry = zmalloc(sizeof(*entry));
-
-// #ifdef _ERASURE_CODE_
-//     entry -> stat_set_commands = server.stat_numsetcommands;
-//     serverLog(LL_NOTICE, "in the entry init, the entry->stat_set_commands = %d", entry->stat_set_commands);
-// #endif
 
     entry->next = ht->table[index];
     ht->table[index] = entry;

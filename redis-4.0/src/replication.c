@@ -341,10 +341,10 @@ void feedParityARGV(client *cl, const int argc, robj** argv){
         strcat(sendStr," ");
 
         dictEntry *entry = dictFind(cl->db->dict, argv[1]->ptr);
-        serverLog(LL_NOTICE, "in the feedParityARGV, the entry->stat_set_commands = %d", entry->stat_set_commands);
+        serverLog(LL_NOTICE, "in the feedParityARGV, the entry->stat_set_commands = %d", *(int *)entry->stat_set_commands);
 
-
-        ll2string(buf,32,entry->stat_set_commands);
+        //buf = (char *)entry->stat_set_commands;
+        sprintf(buf, "%d", *(int *)entry->stat_set_commands);
         strcat(sendStr,buf);
 
 
@@ -416,9 +416,10 @@ void feedParityXOR(client* cl, const char* parityXOR)
         //ll2string(buf,32,server.stat_numsetcommands);
 
         dictEntry *entry = dictFind(cl->db->dict, cl->argv[1]->ptr);
-        serverLog(LL_NOTICE, "in the feedParityXOR, the entry->stat_set_commands = %d", entry->stat_set_commands);
-        ll2string(buf,32,entry->stat_set_commands);
+        serverLog(LL_NOTICE, "in the feedParityXOR, the entry->stat_set_commands = %d", *(int *)entry->stat_set_commands);
 
+        //buf = (char *)entry->stat_set_commands;
+        sprintf(buf, "%d", *(int *)entry->stat_set_commands);
         strcat(sendStr,buf);
 
         redisAppendCommand(c,sendStr);
@@ -471,8 +472,10 @@ void feedParityXORLen(client *cl, const char* parityXOR, int len){
 
         char cnt[32];
         dictEntry *entry = dictFind(cl->db->dict, cl->argv[1]->ptr);
-        serverLog(LL_NOTICE, "in the feedParityXORLen, the entry->stat_set_commands = %d", entry->stat_set_commands);
-        ll2string(cnt,32,entry->stat_set_commands);
+        serverLog(LL_NOTICE, "in the feedParityXORLen, the entry->stat_set_commands = %d", *(int *)entry->stat_set_commands);
+        //ll2string(cnt,32,entry->stat_set_commands);
+        //cnt = (char *)entry->stat_set_commands;
+        sprintf(cnt, "%d", *(int *)entry->stat_set_commands);
 
         char *argv[]={"set","key",parityXOR,flag,cnt};
         size_t argvlen[]={3,3,len,strlen(flag),strlen(cnt)};

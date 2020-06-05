@@ -60,8 +60,8 @@ typedef struct dictEntry {
     } v;
     struct dictEntry *next;
 #ifdef _ERASURE_CODE_
-    long long stat_set_commands;
-    //void *stat_set_commands;
+    //long long stat_set_commands;
+    void *stat_set_commands;
 #endif
 
 } dictEntry;
@@ -145,7 +145,7 @@ typedef void (dictScanBucketFunction)(void *privdata, dictEntry **bucketref);
 
 //# ifdef _ERASURE_CODE
 #define dictSetCnt(d, entry, _cnt_) do { \
-    (entry)->stat_set_commands = (long long)(_cnt_); \
+    (entry)->stat_set_commands = (_cnt_); \
 } while(0)
 //# endif
 
@@ -172,7 +172,7 @@ int dictAdd(dict *d, void *key, void *val);
 # ifdef _ERASURE_CODE_
 int dictAddParity(dict *d, void *cnt, void *key, void *val);
 dictEntry *dictAddRawParity(dict *d, void *cnt, dictEntry **existing);
-dictEntry *dictFindParity(dict *d, void *cnt);
+dictEntry *dictFindParity(dict *d, const void *cnt);
 # endif
 
 dictEntry *dictAddRaw(dict *d, void *key, dictEntry **existing);

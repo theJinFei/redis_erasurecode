@@ -1005,7 +1005,7 @@ struct redisServer {
     long long stat_numcommands;     /* Number of processed commands */
 
 # ifdef _ERASURE_CODE_
-    long long stat_numsetcommands;     /* Number of processed set commands */
+    int stat_numsetcommands;        /* Number of processed set commands */
     int cntflag;
     char *testStr;
     //char *parityValue;

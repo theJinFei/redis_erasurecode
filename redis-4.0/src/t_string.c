@@ -160,6 +160,10 @@ void setGenericCommand(client *c, int flags, robj *key, robj *val, robj *expire,
 
         //feedParityXOR(c, tmpValue);
         feedParityXORLen(c,tmpValue,lentmp);
+
+        free(tmpValue);
+        free(oldValue);
+        free(newValue);
         
     }else{
         feedParityARGV(c, c -> argc, c -> argv);

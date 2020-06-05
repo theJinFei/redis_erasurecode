@@ -1366,10 +1366,10 @@ void processInputBuffer(client *c) {
         }
 
         if (c->reqtype == PROTO_REQ_INLINE) {
-            serverLog(LL_NOTICE,"processInlineBuffer");
+            //serverLog(LL_NOTICE,"processInlineBuffer");
             if (processInlineBuffer(c) != C_OK) break;
         } else if (c->reqtype == PROTO_REQ_MULTIBULK) {
-            serverLog(LL_NOTICE,"processMultibulkBuffer");
+            //serverLog(LL_NOTICE,"processMultibulkBuffer");
             if (processMultibulkBuffer(c) != C_OK) break;
         } else {
             serverPanic("Unknown request type");
