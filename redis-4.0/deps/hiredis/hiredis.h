@@ -207,6 +207,11 @@ int redisvAppendCommand(redisContext *c, const char *format, va_list ap);
 int redisAppendCommand(redisContext *c, const char *format, ...);
 int redisAppendCommandArgv(redisContext *c, int argc, const char **argv, const size_t *argvlen);
 
+
+#ifdef _ERASURE_CODE_
+int redisAppendParityCommand(redisContext *c, const char* sendStr, int len, const char *format, ...);
+#endif
+
 /* Issue a command to Redis. In a blocking context, it is identical to calling
  * redisAppendCommand, followed by redisGetReply. The function will return
  * NULL if there was an error in performing the request, otherwise it will

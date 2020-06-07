@@ -958,6 +958,27 @@ int redisAppendCommand(redisContext *c, const char *format, ...) {
     return ret;
 }
 
+
+
+int redisAppendParityCommand(redisContext *c, const char* sendStr, int len, const char *format, ...) {
+    va_list ap;
+    int ret;
+
+    // va_start(ap,format);
+    
+    // // res = redisvAppendCommand()
+    // if (__redisAppendCommand(c, sendStr, len) != REDIS_OK) {
+    //     free(sendStr);
+    //     return REDIS_ERR;
+    // }
+
+    // free(sendStr);
+
+    // va_end(ap);
+    return ret;
+}
+
+
 int redisAppendCommandArgv(redisContext *c, int argc, const char **argv, const size_t *argvlen) {
     sds cmd;
     int len;
