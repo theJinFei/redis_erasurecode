@@ -303,10 +303,18 @@ int dictAdd(dict *d, void *key, void *val)
 int dictAddParity(dict *d, void *cnt, void *key, void *val){
     dictEntry *entry = dictAddRawParity(d,cnt,NULL);  
 
+    //serverLog(LL_NOTICE,"in the dictAddParity, the entry->cnt is %s", (char *)entry->stat_set_commands);
+
     if (!entry) return DICT_ERR;
 
+    //serverLog(LL_NOTICE,"in the dictAddParity before, the entry->key is %s", (char *)key);
     dictSetKey(d, entry, key);
+    //serverLog(LL_NOTICE,"in the dictAddParity after, the entry->key is %s", (char *)entry->key);
+
+    //serverLog(LL_NOTICE,"in the dictAddParity before, the entry->val is %s", (char *)val);
     dictSetVal(d, entry, val);
+    //serverLog(LL_NOTICE,"in the dictAddParity after, the entry->val is %s", (char *)entry->v.val);
+
     return DICT_OK;
 }
 #endif
@@ -507,6 +515,75 @@ int dictReplace(dict *d, void *key, void *val)
     dictFreeVal(d, &auxentry);
     return 0;
 }
+
+#ifdef _ERASURE_CODE_
+int dictReplaceParity(dict *d, void *cnt, void *key, void *val, int flag){
+    dictEntry *entry, *existing, auxentry;
+
+    entry = dictFindParity(d, cnt);
+    // 先保存原有的值的指针
+    auxentry = *entry;
+
+    serverLog(LL_NOTICE,"in the dictReplaceParity before, the oldkey is %s",(char *)entry->key);
+    serverLog(LL_NOTICE,"in the dictReplaceParity before, the oldval is %s",(char *)entry->v.val);
+
+
+    if(flag == 1){
+        // 校验Key
+        int lenKeyOld=strlen((char*)entry->key);
+        int lenKeyNew=strlen((char*)key);
+
+        int lenkeytmp = (lenKeyOld>lenKeyNew)?lenKeyOld:lenKeyNew;
+
+        char *tmpKey = (char *)malloc(lenkeytmp*sizeof(char));
+        memset(tmpKey,0,(sizeof(char))*lenkeytmp);
+
+        for(int i = 0; i < lenKeyOld; i++){
+            tmpKey[i] ^= ((char*)entry->key)[i];
+        }
+        for(int i = 0; i < lenKeyNew; i++){
+            tmpKey[i] ^= ((char*)key)[i];
+        }
+
+        serverLog(LL_NOTICE,"before Set Parity Key, the tmpKey is %s",tmpKey);
+        // 设置新的key
+        dictSetKey(d, entry, tmpKey);
+
+        // dictFreeKey(d, &auxentry);
+    }
+
+
+    // 校验Value
+    int lenValOld=strlen((char*)entry->v.val);
+    int lenValNew=strlen((char*)val);
+
+    int lenvaltmp = (lenValOld>lenValNew)?lenValOld:lenValNew;
+
+    char *tmpValue = (char *)malloc(lenvaltmp*sizeof(char));
+    memset(tmpValue,0,(sizeof(char))*lenvaltmp);
+
+    for(int i = 0; i < lenValOld; i++){
+        tmpValue[i] ^= ((char*)entry->v.val)[i];
+    }
+    for(int i = 0; i < lenValNew; i++){
+        tmpValue[i] ^= ((char*)val)[i];
+    }
+
+    serverLog(LL_NOTICE,"before Set Parity Val, the tmpValue is %s",tmpValue);
+    // 设置新的val
+    dictSetVal(d, entry, tmpValue);
+
+    serverLog(LL_NOTICE,"after Set Parity Val, the NewValue is %s",(char *)entry->v.val);
+
+
+    // 释放旧值 
+    // dictFreeVal(d, &auxentry);
+
+    serverLog(LL_NOTICE,"in the dictReplaceParity and before return");
+    return 0;
+
+}
+#endif
 
 #ifdef USE_PMDK
 /* Add an element, discarding the old if the key already exists.

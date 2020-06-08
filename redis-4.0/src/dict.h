@@ -173,6 +173,7 @@ int dictAdd(dict *d, void *key, void *val);
 int dictAddParity(dict *d, void *cnt, void *key, void *val);
 dictEntry *dictAddRawParity(dict *d, void *cnt, dictEntry **existing);
 dictEntry *dictFindParity(dict *d, const void *cnt);
+int dictReplaceParity(dict *d, void *cnt, void *key, void *val, int flag);
 # endif
 
 dictEntry *dictAddRaw(dict *d, void *key, dictEntry **existing);

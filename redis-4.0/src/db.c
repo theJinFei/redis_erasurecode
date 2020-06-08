@@ -181,7 +181,13 @@ void dbAdd(redisDb *db, robj *key, robj *val) {
 #ifdef _ERASURE_CODE_
 void dbAddParity(redisDb *db, robj *key, robj *val, robj *cnt){
     sds copy = sdsdup(cnt->ptr);
-    int retval = dictAddParity(db->dict, copy, key, val);
+
+    //serverLog(LL_NOTICE,"in the dbAddParity before, the key is %s",(char *)key->ptr);
+    //serverLog(LL_NOTICE,"in the dbAddParity before, the val is %s",(char *)val->ptr);
+    int retval = dictAddParity(db->dict, copy, key->ptr, val->ptr);
+
+    
+    if (server.cluster_enabled) slotToKeyAdd(cnt);
 }
 #endif
 
@@ -227,6 +233,27 @@ void dbOverwrite(redisDb *db, robj *key, robj *val) {
         dictReplace(db->dict, key->ptr, val);
     }
 }
+
+#ifdef _ERASURE_CODE_
+void dbOverwriteParity(redisDb *db, robj *key, robj *val, robj *cnt) {
+    dictEntry *de = dictFindParity(db->dict,cnt->ptr);
+    serverAssertWithInfo(NULL,key,de != NULL);
+
+    serverLog(LL_NOTICE,"in the dbOverwriteParity before, the key is %s",(char *)key->ptr);
+    serverLog(LL_NOTICE,"in the dbOverwriteParity before, the val is %s",(char *)val->ptr);
+    
+    int flag = 1;
+    dictReplaceParity(db->dict, cnt->ptr, key->ptr, val->ptr, flag);
+}
+
+void dbUpdateParity(redisDb *db, robj *key, robj *val, robj *cnt) {
+    dictEntry *de = dictFindParity(db->dict,cnt->ptr);
+    serverAssertWithInfo(NULL,key,de != NULL);
+    
+    int flag = 2;
+    dictReplaceParity(db->dict, cnt->ptr, key->ptr, val->ptr, flag);
+}
+#endif
 
 
 #ifdef USE_PMDK

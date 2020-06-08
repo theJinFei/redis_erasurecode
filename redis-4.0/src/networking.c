@@ -1418,15 +1418,7 @@ void processInputBuffer(client *c) {
                     if(tmp!=NULL){
                         serverLog(LL_NOTICE,"processEncodeCommand is OK, and the Entry:");
                         serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmp->stat_set_commands);
-
-                        //int tmpLen = strlen((char*)tmp->key);
-                        //char *tmpKey = (char *)malloc(tmpLen*sizeof(char));
-                        //strcpy(tmpKey,(char *)tmp->key);
                         serverLog(LL_NOTICE,"Entry->key: %s", (char*)tmp->key);
-
-                        //tmpLen = strlen((char*)tmp->v);
-                        //char *tmpV = (char *)malloc(tmpLen*sizeof(char));
-                        //strcpy(tmpV,(char *)tmp->v);
                         serverLog(LL_NOTICE,"Entry->val: %s", (char*)tmp->v.val);
                     }
                     else{
@@ -1435,39 +1427,55 @@ void processInputBuffer(client *c) {
                 }
                 break;
             case PARITY_READ_BUFFER_AND_UPDATE: 
-                serverLog(LL_NOTICE,"this is networking's PARITY_READ_BUFFER_AND_UPDATE, and the flag is %d", e[0] - '0');
-
-                char* receiveStr = (char*)(c -> argv[2] -> ptr);
-
-                FILE *fp;
-                fp = fopen("/home/gengyj/testredis/tmp/receiveStr.bin","wb+");
-                fprintf(fp,receiveStr);
-                fclose(fp);
-
-                serverLog(LL_NOTICE,"the receiveStr is %s",receiveStr);
-                for(int i=0;i<strlen(receiveStr);i++){
-                    serverLog(LL_NOTICE, "the NO.%d receiveStr is %d", i, (int)receiveStr[i]);
+                if (processUpdateParityCommand(c) != C_OK){
+                    serverLog(LL_NOTICE,"Process Update Parity error in processInputBuffer");
+                }
+                else{
+                    dictEntry *tmp = dictFindParity(c->db->dict,c->argv[4]->ptr);
+                    if(tmp!=NULL){
+                        serverLog(LL_NOTICE,"processUpdateParityCommand is OK, and the Entry:");
+                        serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmp->stat_set_commands);
+                        serverLog(LL_NOTICE,"Entry->key: %s", (char*)tmp->key);
+                        serverLog(LL_NOTICE,"Entry->val: %s", (char*)tmp->v.val);
+                    }
+                    else{
+                        serverLog(LL_NOTICE,"The entry is empty");
+                    }       
                 }
 
-                int lenRe=strlen(receiveStr);
-                int lenTe=strlen(server.testStr);
+                // serverLog(LL_NOTICE,"this is networking's PARITY_READ_BUFFER_AND_UPDATE, and the flag is %d", e[0] - '0');
 
-                int lentmp = (lenRe>lenTe)?lenRe:lenTe;
+                // char* receiveStr = (char*)(c -> argv[2] -> ptr);
 
-                char *tmpValue = (char *)malloc(lentmp*sizeof(char));
-                memset(tmpValue,0,(sizeof(char))*lentmp);
+                // FILE *fp;
+                // fp = fopen("/home/gengyj/testredis/tmp/receiveStr.bin","wb+");
+                // fprintf(fp,receiveStr);
+                // fclose(fp);
 
-                for(int i = 0; i < lenRe; i++){
-                    tmpValue[i] ^= receiveStr[i];
-                }
-                for(int i = 0; i < lenTe; i++){
-                    tmpValue[i] ^= server.testStr[i];
-                }
+                // serverLog(LL_NOTICE,"the receiveStr is %s",receiveStr);
+                // for(int i=0;i<strlen(receiveStr);i++){
+                //     serverLog(LL_NOTICE, "the NO.%d receiveStr is %d", i, (int)receiveStr[i]);
+                // }
 
-                server.testStr = tmpValue;
+                // int lenRe=strlen(receiveStr);
+                // int lenTe=strlen(server.testStr);
 
-                serverLog(LL_NOTICE, "the tmpValue after update is %s", tmpValue);
-                serverLog(LL_NOTICE, "the server.testStr after update is %s", server.testStr);
+                // int lentmp = (lenRe>lenTe)?lenRe:lenTe;
+
+                // char *tmpValue = (char *)malloc(lentmp*sizeof(char));
+                // memset(tmpValue,0,(sizeof(char))*lentmp);
+
+                // for(int i = 0; i < lenRe; i++){
+                //     tmpValue[i] ^= receiveStr[i];
+                // }
+                // for(int i = 0; i < lenTe; i++){
+                //     tmpValue[i] ^= server.testStr[i];
+                // }
+
+                // server.testStr = tmpValue;
+
+                // serverLog(LL_NOTICE, "the tmpValue after update is %s", tmpValue);
+                // serverLog(LL_NOTICE, "the server.testStr after update is %s", server.testStr);
                 
                 break;
             case PARITY_NOTIFY_DATANODE: 

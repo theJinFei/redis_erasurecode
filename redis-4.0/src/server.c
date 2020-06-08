@@ -2642,13 +2642,40 @@ int processEncodeCommand(client *c){
 
     if (dictFindParity(c->db->dict,c->argv[4]->ptr) == NULL) {
         //全新的cnt，向hash表中插入key,val,cnt
-        serverLog(LL_NOTICE,"dictFindParity is NULL");
+        serverLog(LL_NOTICE,"dictFindParity is NULL and dbAddParity");
         dbAddParity(c->db,c->argv[1],c->argv[2],c->argv[4]);
     } else {
         //已经有过的cnt
         //另一个data node的同cnt命令，做校验后插入
-        //同一个data node的同cnt命令的更新，异或更新增量后插入
-        //dbOverwrite(db,key,val);
+        serverLog(LL_NOTICE,"dictFindParity isn't NULL and dbOverwriteParity");
+        dbOverwriteParity(c->db,c->argv[1],c->argv[2],c->argv[4]);
+    }
+
+    return C_OK;
+}
+
+int processUpdateParityCommand(client *c){
+    serverLog(LL_NOTICE,"in the processUpdateParityCommand");
+    int j;
+    for(j = 0; j < c -> argc; j++){
+        robj* o = c -> argv[j];
+        serverLog(LL_NOTICE,"int the processUpdateParityCommand, the obj is %s", (char*)(o -> ptr));
+    }
+
+    //db = c->db;
+    //dict = c->db->dict;
+    //key = c->agrv[1];
+    //val = c->agrv[2];
+    //cnt = c->argv[4];
+
+    if (dictFindParity(c->db->dict,c->argv[4]->ptr) == NULL) {
+        serverLog(LL_NOTICE,"Error: int the UpdateParity, dictFindParity is NULL");
+        return C_ERR;
+    } else {
+        //已经有过的cnt
+        //另一个data node的同cnt命令，做校验后插入
+        serverLog(LL_NOTICE,"dictFindParity isn't NULL and dbUpdateParity");
+        dbUpdateParity(c->db,c->argv[1],c->argv[2],c->argv[4]);
     }
 
     return C_OK;

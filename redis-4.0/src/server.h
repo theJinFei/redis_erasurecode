@@ -1718,6 +1718,7 @@ int processCommand(client *c);
 
 #ifdef _ERASURE_CODE_
 int processEncodeCommand(client *c);
+int processUpdateParityCommand(client *c);
 void setParityEntry(redisDb *db, dictEntry *entry);
 #endif
 
@@ -1848,6 +1849,8 @@ robj *dbUnshareStringValue(redisDb *db, robj *key, robj *o);
 
 # ifdef _ERASURE_CODE_
 void dbAddParity(redisDb *db, robj *key, robj *val, robj *cnt);
+void dbOverwriteParity(redisDb *db, robj *key, robj *val, robj *cnt);
+void dbUpdateParity(redisDb *db, robj *key, robj *val, robj *cnt);
 # endif
 
 #define EMPTYDB_NO_FLAGS 0      /* No flags. */
