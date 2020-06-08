@@ -1008,6 +1008,7 @@ struct redisServer {
     int stat_numsetcommands;        /* Number of processed set commands */
     int cntflag;
     char *testStr;
+    int testStrLen;
     //char *parityValue;
 # endif
 
