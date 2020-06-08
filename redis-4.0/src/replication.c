@@ -286,6 +286,7 @@ void replicationFeedSlaves(list *slaves, int dictid, robj **argv, int argc) {
 #include "parity.h"
 #include "cluster.h"
 # include "./../deps/hiredis/hiredis.h"
+# include "./../deps/hiredis/read.h"
 void feedParityARGV(client *cl, const int argc, robj** argv){
 
     // 这里是不是应该不写这里？应该写db.c 插入到数据库之后，应该计算差值，实现value增量更新。
@@ -314,7 +315,7 @@ void feedParityARGV(client *cl, const int argc, robj** argv){
 
         char *sendStr = (char *) malloc(sizeof(char)*100);
         memset(sendStr,0,sizeof(char)*100);
-        for(int i=0;i<argc;i++){
+        for(int i=0;i<argc - 1;i++){
             if(argv[i]->encoding == OBJ_ENCODING_INT){
             
                 char buf[32];
@@ -335,20 +336,55 @@ void feedParityARGV(client *cl, const int argc, robj** argv){
             }   
             strcat(sendStr," ");
         }
+        
+        // flag 
         char buf[32];
         ll2string(buf,32,(long)PARITY_READ_BUFFER_AND_ENCODE);
         strcat(sendStr,buf);
         strcat(sendStr," ");
 
+        memset(buf, 0, sizeof(char) * 32);
+        // cnt
         dictEntry *entry = dictFind(cl->db->dict, argv[1]->ptr);
         serverLog(LL_NOTICE, "in the feedParityARGV, the entry->stat_set_commands = %d", *(int *)entry->stat_set_commands);
 
         //buf = (char *)entry->stat_set_commands;
-        sprintf(buf, "%d", *(int *)entry->stat_set_commands);
+        // sprintf(buf, "%d", *(int *)entry->stat_set_commands); ????
+        ll2string(buf,32, *(int *)entry->stat_set_commands);
         strcat(sendStr,buf);
+        strcat(sendStr," ");
 
+        serverLog(LL_NOTICE, "before sendStr = %s, the argc is %d",sendStr, argc);
+        // 最后一个 解析 value
+        if(argv[argc - 1]->encoding == OBJ_ENCODING_INT){
+            // char buf[32];
+            memset(buf, 0, sizeof(char) * 32);
+            ll2string(buf,32,(long)argv[argc - 1]->ptr);
+
+            // 长度
+            char bufflen[32];
+            memset(bufflen, 0, sizeof(char) * 32);
+            ll2string(bufflen,32,strlen(buf));
+            strcat(sendStr, bufflen);
+            strcat(sendStr, " ");
+
+            // 真正的内容
+            strcat(sendStr,buf);
+        }else{
+            // 长度
+            char bufflen[32];
+            memset(bufflen, 0, sizeof(char) * 32);
+            ll2string(bufflen,32,strlen((char*)(argv[argc - 1]->ptr)));
+            strcat(sendStr, bufflen);
+            strcat(sendStr, " ");
+
+            strcat(sendStr,(char*)(argv[argc - 1]->ptr));
+        }
+
+        serverLog(LL_NOTICE, "before sendStr = %s",sendStr);
 
         //redisAppendCommand(c,"set foo bar 1");
+        // set key flag cnt len value
         redisAppendCommand(c,sendStr);
 
         //serverLog(LL_NOTICE, "after redisAppendCommand, the server.stat_numsetcommands = %d", server.stat_numsetcommands);
@@ -362,7 +398,7 @@ void feedParityARGV(client *cl, const int argc, robj** argv){
         serverLog(LL_NOTICE, "the reply is %s", reply -> str);
         freeReplyObject(reply);
         redisFree(c);
-        // serverLog(LL_NOTICE, "the message has already sended .... ");
+
     }
 
 }
@@ -464,34 +500,181 @@ void feedParityXORLen(client *cl, const char* parityXOR, int len){
 
         // 需要添加非set命令 如果那边解析到了
         /*添加命令set */
+        // 拼装成一个字符串 直接使用memcpy拷贝到c -> o buffer
+        // set key flag cnt len pairtyXOR
+        // char *sendStr = (char *) malloc(sizeof(char)*100);
+        // memset(sendStr,0,sizeof(char)*100);
 
-        int argc = 5;
+        sds sendStr;
+        sendStr = sdsempty();
+        sendStr = sdsMakeRoomFor(sendStr, 100);
+        size_t argc = 6;
+        sendStr = sdscatfmt(sendStr, "*%i\r\n", argc);
+
+        // serverLog(LL_NOTICE, "the sensStr is %s", sendStr);
+        // set 
+        argc = 3;
+        sendStr = sdscatfmt(sendStr, "$%u\r\n", argc);
+        sendStr = sdscatlen(sendStr, "SET", argc);
+        sendStr = sdscatlen(sendStr, "\r\n", sizeof("\r\n")-1);
+
+        // key
+        argc = 5;
+        sendStr = sdscatfmt(sendStr, "$%u\r\n", argc);
+        sendStr = sdscatlen(sendStr, "mykey", argc);
+        sendStr = sdscatlen(sendStr, "\r\n", sizeof("\r\n")-1);     
         
+        // flag
         char flag[32];
+        memset(flag, 0, sizeof(char) * 32);
         ll2string(flag,32,(long)PARITY_READ_BUFFER_AND_UPDATE);
-
-        char cnt[32];
+        sendStr = sdscatfmt(sendStr, "$%u\r\n", strlen(flag));
+        sendStr = sdscatlen(sendStr, flag, strlen(flag));
+        sendStr = sdscatlen(sendStr, "\r\n", sizeof("\r\n")-1);     
+        
+        // cnt
         dictEntry *entry = dictFind(cl->db->dict, cl->argv[1]->ptr);
         serverLog(LL_NOTICE, "in the feedParityXORLen, the entry->stat_set_commands = %d", *(int *)entry->stat_set_commands);
-        //ll2string(cnt,32,entry->stat_set_commands);
-        //cnt = (char *)entry->stat_set_commands;
-        sprintf(cnt, "%d", *(int *)entry->stat_set_commands);
+        memset(flag, 0, sizeof(char) * 32);
+        ll2string(flag, 32, *(int *)entry->stat_set_commands);
+        sendStr = sdscatfmt(sendStr, "$%u\r\n", strlen(flag));
+        sendStr = sdscatlen(sendStr, flag, strlen(flag));
+        sendStr = sdscatlen(sendStr, "\r\n", sizeof("\r\n")-1);     
+        
+        // len
+        memset(flag, 0, sizeof(char) * 32);
+        ll2string(flag, 32, len);
+        sendStr = sdscatfmt(sendStr, "$%u\r\n", strlen(flag));
+        sendStr = sdscatlen(sendStr, flag, strlen(flag));
+        sendStr = sdscatlen(sendStr, "\r\n", sizeof("\r\n")-1); 
 
-        char *argv[]={"set","key",parityXOR,flag,cnt};
-        size_t argvlen[]={3,3,len,strlen(flag),strlen(cnt)};
+        int beforelen = sdslen(sendStr);
 
-        serverLog(LL_NOTICE, "in the feedParityXORLen, the len of parityXOR = %d", len);
-        serverLog(LL_NOTICE, "in the feedParityXORLen, the len of flag = %d", strlen(flag));
-        serverLog(LL_NOTICE, "in the feedParityXORLen, the len of cnt = %d", strlen(cnt));
+        // value
+        sendStr = sdscatfmt(sendStr, "$%u\r\n", len);
+        sendStr = sdscatlen(sendStr, parityXOR, len);
+        sendStr = sdscatlen(sendStr, "\r\n", sizeof("\r\n")-1);
+        
+        int afterlen = sdslen(sendStr);
+        serverLog(LL_NOTICE, "the len diff is %d", afterlen - beforelen);
+        serverLog(LL_NOTICE, "the sensStr is %s", sendStr);
+        __redisAppendCommand(c, sendStr, afterlen);
 
-
-        redisAppendCommandArgv(c,argc,argv,argvlen);
+        serverLog(LL_NOTICE, "the c -> obuf is %s", c -> obuf);
 
         /*获取set命令结果*/
         redisGetReply(c,&reply); // reply for SET
         serverLog(LL_NOTICE, "the reply is %s", reply -> str);
         freeReplyObject(reply);
         redisFree(c);
+
+        // strcat(sendStr, "*6\r\n");
+        // strcat(sendStr, "$3\r\n");
+        // strcat(sendStr, "SET\r\n");
+        // strcat(sendStr, "$5\r\n");
+        // strcat(sendStr, "mykey\r\n");
+
+        // // 拼接flag
+        // strcat(sendStr, "$");
+        // char flag[32];
+        // ll2string(flag,32,(long)PARITY_READ_BUFFER_AND_UPDATE);
+        // // strcat(sendStr, strlen(flag));
+        // // 长度
+        // char bufflen[32];
+        // memset(bufflen, 0, sizeof(char) * 32);
+        // ll2string(bufflen,32,strlen(flag));
+        // strcat(sendStr, bufflen);
+        // strcat(sendStr, "\r\n");
+        // // 内容
+        // strcat(sendStr, flag);
+        // strcat(sendStr, "\r\n");
+
+        // // 拼接cnt
+        // strcat(sendStr, "$");
+        // char cnt[32];
+        // dictEntry *entry = dictFind(cl->db->dict, cl->argv[1]->ptr);
+        // serverLog(LL_NOTICE, "in the feedParityXORLen, the entry->stat_set_commands = %d", *(int *)entry->stat_set_commands);
+        // ll2string(cnt, 32, *(int *)entry->stat_set_commands);
+
+        // // 长度
+        // memset(bufflen, 0, sizeof(char) * 32);
+        // ll2string(bufflen,32,strlen(cnt));
+        // strcat(sendStr, bufflen);
+        // strcat(sendStr, "\r\n");
+
+        // // 内容
+        // strcat(sendStr, cnt);
+        // strcat(sendStr, "\r\n");
+        // serverLog(LL_NOTICE, "in the feedParityXORLen, the cnt = %s", cnt);
+
+        // // serverLog(LL_NOTICE, "the sensStr is %s", sendStr);
+
+        // // 拼装更新后的value 
+        // strcat(sendStr, "$");
+        // // 长度
+        // memset(bufflen, 0, sizeof(char) * 32);
+        // ll2string(bufflen, 32, len );
+        // strcat(sendStr, bufflen);
+        // strcat(sendStr, "\r\n");
+
+        // // serverLog(LL_NOTICE, "the sensStr is %s", sendStr);
+
+        // int curlen = strlen(sendStr);
+        // serverLog(LL_NOTICE, "the curLen is %d", curlen);
+        // // for(int i = 0; i < curlen; i++){
+        // //     serverLog(LL_NOTICE, "the curlen:%d is %s", i, sendStr[i]);
+        // // }
+        // // serverLog(LL_NOTICE, "the sensStr is %s", sendStr);
+
+        // memcpy(sendStr + curlen, parityXOR, len);   // 先加内容
+        // curlen += len;
+        // memcpy(sendStr + curlen, "\r\n", 2);        // 后加结尾
+        // curlen += 2;
+
+        // sendStr[curlen] = '\0';
+
+        // for(int i = 0; i < curlen; i++){
+        //     serverLog(LL_NOTICE, "the curlen:%d is %s", i, sendStr[i]);
+        // }
+
+        // sdscatlen(c -> obuf, sendStr, curlen);      // 最后直接拷贝到 c -> obuf中
+        // redisAppendCommand
+        // redisAppendCommand
+        // __redisAppendCommand(c, sendStr, curlen);
+        // redisAppendCommand
+        // redisAppendParityCommand(c, sendStr, curlen, sendStr);
+        // redisAppendCommand
+        // redisAppendParityCommand(c, sendStr, curlen, sendStr);
+
+
+        // __redisAppendCommand(c, sendStr, len);
+        // sds newbuf;
+
+        // newbuf = sdscatlen(c->obuf,sendStr, curlen);
+        // if (newbuf == NULL) {
+        //     __redisSetError(c,REDIS_ERR_OOM,"Out of memory");
+        //     // return REDIS_ERR;
+        // }
+
+        // c->obuf = newbuf;
+
+        // redisAppendFormattedCommand(c, sendStr, curlen);
+
+        // if (__redisAppendCommand(c, sendStr, curlen) != REDIS_OK) {
+        //     free(sendStr);
+        //     serverLog(LL_NOTICE, "the __redisAppendCommand has error ");
+        //     // return REDIS_ERR;
+        // }
+
+        // free(sendStr);
+
+        // serverLog(LL_NOTICE, "the c -> obuf is %s", c -> obuf);
+        // // redisAppendCommand
+        // /*获取set命令结果*/
+        // redisGetReply(c,&reply); // reply for SET
+        // serverLog(LL_NOTICE, "the reply is %s", reply -> str);
+        // freeReplyObject(reply);
+        // redisFree(c);
     }
 }
 

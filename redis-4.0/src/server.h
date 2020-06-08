@@ -1008,6 +1008,7 @@ struct redisServer {
     int stat_numsetcommands;        /* Number of processed set commands */
     int cntflag;
     char *testStr;
+    int testStrLen;
     //char *parityValue;
 # endif
 
@@ -1848,9 +1849,9 @@ int dbDelete(redisDb *db, robj *key);
 robj *dbUnshareStringValue(redisDb *db, robj *key, robj *o);
 
 # ifdef _ERASURE_CODE_
-void dbAddParity(redisDb *db, robj *key, robj *val, robj *cnt);
-void dbOverwriteParity(redisDb *db, robj *key, robj *val, robj *cnt);
-void dbUpdateParity(redisDb *db, robj *key, robj *val, robj *cnt);
+void dbAddParity(redisDb *db, robj *key, robj *val, robj *cnt, robj *len);
+void dbOverwriteParity(redisDb *db, robj *key, robj *val, robj *cnt, robj *len);
+void dbUpdateParity(redisDb *db, robj *key, robj *val, robj *cnt, robj *len);
 # endif
 
 #define EMPTYDB_NO_FLAGS 0      /* No flags. */

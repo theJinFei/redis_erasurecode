@@ -300,7 +300,7 @@ int dictAdd(dict *d, void *key, void *val)
 }
 
 #ifdef _ERASURE_CODE_
-int dictAddParity(dict *d, void *cnt, void *key, void *val){
+int dictAddParity(dict *d, void *cnt, void *key, void *val, void *len){
     dictEntry *entry = dictAddRawParity(d,cnt,NULL);  
 
     //serverLog(LL_NOTICE,"in the dictAddParity, the entry->cnt is %s", (char *)entry->stat_set_commands);
@@ -314,6 +314,8 @@ int dictAddParity(dict *d, void *cnt, void *key, void *val){
     //serverLog(LL_NOTICE,"in the dictAddParity before, the entry->val is %s", (char *)val);
     dictSetVal(d, entry, val);
     //serverLog(LL_NOTICE,"in the dictAddParity after, the entry->val is %s", (char *)entry->v.val);
+
+    dictSetLen(d, entry, len);
 
     return DICT_OK;
 }
@@ -517,7 +519,7 @@ int dictReplace(dict *d, void *key, void *val)
 }
 
 #ifdef _ERASURE_CODE_
-int dictReplaceParity(dict *d, void *cnt, void *key, void *val, int flag){
+int dictReplaceParity(dict *d, void *cnt, void *key, void *val, void *len, int flag){
     dictEntry *entry, *existing, auxentry;
 
     entry = dictFindParity(d, cnt);
@@ -554,8 +556,10 @@ int dictReplaceParity(dict *d, void *cnt, void *key, void *val, int flag){
 
 
     // 校验Value
-    int lenValOld=strlen((char*)entry->v.val);
-    int lenValNew=strlen((char*)val);
+    int lenValOld=atoi((char*)entry->val_len);
+    int lenValNew=atoi((char*)len);
+
+    serverLog(LL_NOTICE,"the lenValOld = %d, the lenValNew = %d", lenValOld, lenValNew);
 
     int lenvaltmp = (lenValOld>lenValNew)?lenValOld:lenValNew;
 
@@ -575,6 +579,10 @@ int dictReplaceParity(dict *d, void *cnt, void *key, void *val, int flag){
 
     serverLog(LL_NOTICE,"after Set Parity Val, the NewValue is %s",(char *)entry->v.val);
 
+    // 设置新的val_len
+    void* tmpLen = (lenValOld>lenValNew)?entry->val_len:len;
+    //serverLog(LL_NOTICE,"before dictSetLen, the val_len = %d", lenvaltmp);
+    dictSetLen(d, entry, tmpLen);
 
     // 释放旧值 
     // dictFreeVal(d, &auxentry);

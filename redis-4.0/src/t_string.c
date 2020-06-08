@@ -152,10 +152,10 @@ void setGenericCommand(client *c, int flags, robj *key, robj *val, robj *expire,
         }
         
 
-        FILE *fp;
-        fp = fopen("/home/gengyj/testredis/tmp/tmpValue.bin","wb+");
-        fprintf(fp,tmpValue);
-        fclose(fp);
+        // FILE *fp;
+        // fp = fopen("./tmpValue.bin","wb+");
+        // fprintf(fp,tmpValue);
+        // fclose(fp);
 
 
         //feedParityXOR(c, tmpValue);

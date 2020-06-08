@@ -1577,6 +1577,7 @@ void initServerConfig(void) {
 # ifdef _ERASURE_CODE_
     server.parityDict = dictCreate(&dbDictTypePairty, NULL);
     server.testStr=NULL;
+    server.testStrLen = 0;
     //server.parityValue=NULL;
 # endif
 
@@ -2637,18 +2638,20 @@ int processEncodeCommand(client *c){
     //db = c->db;
     //dict = c->db->dict;
     //key = c->agrv[1];
-    //val = c->agrv[2];
-    //cnt = c->argv[4];
+    //flag = c->agrv[2];
+    //cnt = c->argv[3];
+    //val_len = c->argv[4];
+    //val = c->argv[5];
 
-    if (dictFindParity(c->db->dict,c->argv[4]->ptr) == NULL) {
+    if (dictFindParity(c->db->dict,c->argv[3]->ptr) == NULL) {
         //全新的cnt，向hash表中插入key,val,cnt
         serverLog(LL_NOTICE,"dictFindParity is NULL and dbAddParity");
-        dbAddParity(c->db,c->argv[1],c->argv[2],c->argv[4]);
+        dbAddParity(c->db,c->argv[1],c->argv[5],c->argv[3],c->argv[4]);
     } else {
         //已经有过的cnt
         //另一个data node的同cnt命令，做校验后插入
         serverLog(LL_NOTICE,"dictFindParity isn't NULL and dbOverwriteParity");
-        dbOverwriteParity(c->db,c->argv[1],c->argv[2],c->argv[4]);
+        dbOverwriteParity(c->db, c->argv[1], c->argv[5], c->argv[3], c->argv[4]);
     }
 
     return C_OK;
@@ -2665,17 +2668,19 @@ int processUpdateParityCommand(client *c){
     //db = c->db;
     //dict = c->db->dict;
     //key = c->agrv[1];
-    //val = c->agrv[2];
-    //cnt = c->argv[4];
+    //flag = c->agrv[2];
+    //cnt = c->argv[3];
+    //val_len = c->argv[4];
+    //val = c->argv[5];
 
-    if (dictFindParity(c->db->dict,c->argv[4]->ptr) == NULL) {
+    if (dictFindParity(c->db->dict,c->argv[3]->ptr) == NULL) {
         serverLog(LL_NOTICE,"Error: int the UpdateParity, dictFindParity is NULL");
         return C_ERR;
     } else {
         //已经有过的cnt
         //另一个data node的同cnt命令，做校验后插入
         serverLog(LL_NOTICE,"dictFindParity isn't NULL and dbUpdateParity");
-        dbUpdateParity(c->db,c->argv[1],c->argv[2],c->argv[4]);
+        dbUpdateParity(c->db, c->argv[1], c->argv[5], c->argv[3], c->argv[4]);
     }
 
     return C_OK;
