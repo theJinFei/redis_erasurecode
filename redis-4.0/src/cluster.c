@@ -3763,7 +3763,7 @@ void clusterUpdateState(void) {
         }
 
         /* Change the state and log the event. */
-        serverLog(LL_WARNING,"Cluster state changed: %s",
+        serverLog(LL_NOTICE,"Cluster state changed: %s",
             new_state == CLUSTER_OK ? "ok" : "fail");
         server.cluster->state = new_state;
     }
@@ -5485,7 +5485,8 @@ void clusterRedirectClient(client *c, clusterNode *n, int hashslot, int error_co
          * a migration or import in progress. */
         addReplySds(c,sdsnew("-TRYAGAIN Multiple keys request during rehashing of slot\r\n"));
     } else if (error_code == CLUSTER_REDIR_DOWN_STATE) {
-        addReplySds(c,sdsnew("-CLUSTERDOWN The cluster is down\r\n"));
+        //addReplySds(c,sdsnew("-CLUSTERDOWN The cluster is down\r\n"));
+        addReplySds(c,sdsnew("-CLUSTERDOWN The cluster is down and this is the test code\r\n"));
     } else if (error_code == CLUSTER_REDIR_DOWN_UNBOUND) {
         addReplySds(c,sdsnew("-CLUSTERDOWN Hash slot not served\r\n"));
     } else if (error_code == CLUSTER_REDIR_MOVED ||
