@@ -275,6 +275,8 @@ void clusterRedirectClient(client *c, clusterNode *n, int hashslot, int error_co
 clusterNode* getNodeByDict(const char* ip, const uint16_t port, const uint16_t cport);
 void clusterWriteHandler(aeEventLoop *el, int fd, void *privdata, int mask);
 void clusterAcceptHandler(aeEventLoop *el, int fd, void *privdata, int mask);
+
+int processRecoveryGet(client *c);
 # endif
 
 #endif /* __CLUSTER_H */

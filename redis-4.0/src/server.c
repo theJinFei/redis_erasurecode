@@ -2734,6 +2734,33 @@ int processUpdateParityCommand(client *c){
 
     return C_OK;
 }
+
+int processReplyGet(client *c){
+    //key = c->argv[1]
+    dictEntry *tmp = dictFind(server.KeyCntDict,c->argv[1]->ptr);
+    if(tmp!=NULL){
+        serverLog(LL_NOTICE,"in the processReplyGet, Entry->cnt: %s", (char *)tmp->stat_set_commands);
+        serverLog(LL_NOTICE,"in the processReplyGet, Entry->key: %s", (char*)tmp->key);
+    }
+
+    dictEntry *result = dictFindParity(server.parityDict,tmp->stat_set_commands);
+    
+    // robj *val = dictGetVal(result);
+    // val->type = OBJ_STRING;
+    // robj *key = dictGetKey(result);
+    // robj *cnt = dictGetCnt(result);
+
+    serverLog(LL_NOTICE,"in the processReplyGet, result->value: %s", (char*)result->v.val);
+    // serverLog(LL_NOTICE,"in the processReplyGet, result->type: %d", val->type);
+    // serverLog(LL_NOTICE,"in the processReplyGet, result->type: %d", key->type);
+    // serverLog(LL_NOTICE,"in the processReplyGet, result->type: %d", cnt->type);
+ 
+    // addReplyBulk(c,val);
+    addReplyString(c,(char*)result->v.val,strlen((char*)result->v.val));
+
+    return C_OK;
+}
+
 #endif
 
 

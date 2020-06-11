@@ -1723,6 +1723,8 @@ void insertKeyCntDict(client* c);
 int processEncodeCommand(client *c);
 int processUpdateParityCommand(client *c);
 void setParityEntry(redisDb *db, dictEntry *entry);
+
+int processReplyGet(client *c);
 #endif
 
 void setupSignalHandlers(void);

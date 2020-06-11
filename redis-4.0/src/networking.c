@@ -1465,8 +1465,15 @@ void processInputBuffer(client *c) {
 
             case PARITY_NOTIFY_DATANODE: 
                 serverLog(LL_NOTICE,"in the PARITY_NOTIFY_DATANODE");
-                
-                break;
+                //addReply(c,shared.noautherr);
+
+                if(processReplyGet(c)!=C_OK){
+                    serverLog(LL_NOTICE,"processStartReGet is Error");
+                }
+                else{
+                    serverLog(LL_NOTICE,"need to send the result to client");
+                }
+                return;
 
             //case huifu;
             default :
@@ -1474,8 +1481,6 @@ void processInputBuffer(client *c) {
             }
 
     }
-        
-        
         
 # endif
 
