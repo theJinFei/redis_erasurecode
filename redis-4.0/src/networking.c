@@ -1423,8 +1423,6 @@ void processInputBuffer(client *c) {
                 serverLog(LL_NOTICE,"in the PARITY_READ_BUFFER_AND_ENCODE, and the server.testStr is %s", server.testStr);
                 
                 insertKeyCntDict(c);
-
-
                 if (processEncodeCommand(c) != C_OK){
                     serverLog(LL_NOTICE,"Process Encode error in processInputBuffer");
                 }
@@ -1461,51 +1459,12 @@ void processInputBuffer(client *c) {
                         serverLog(LL_NOTICE,"The entry is empty");
                     }       
                 }
-
-                // char* receiveStr = (char*)(c -> argv[5] -> ptr);
-
-                // // FILE *fp;
-                // // fp = fopen("./receiveStr.bin","wb+");
-                // // fprintf(fp,receiveStr);
-                // // fclose(fp);
-
-                // serverLog(LL_NOTICE,"the receiveStr is %s",receiveStr);
-
-                // // 这里应该用atoi将char* 转 int
-                // for(int i=0; i < atoi(diffLen); i++){
-                //     serverLog(LL_NOTICE, "the NO.%d diff is %c", i, receiveStr[i]);
-                // }
-                
-                // int lenRe = atoi(diffLen);
-
-                // // 不能使用strlen 会不计入\0 需要做一个变量 表示当前len长度
-                // int lenTe = server.testStrLen;              
-
-                // int lentmp = (lenRe > lenTe) ? lenRe : lenTe;
-
-                // char *tmpValue = (char *)malloc(lentmp*sizeof(char));
-                // memset(tmpValue,0,(sizeof(char))*lentmp);
-
-                // // 新值
-                // for(int i = 0; i < lenRe; i++){
-                //     tmpValue[i] ^= receiveStr[i];
-                // }
-
-                // // 旧值
-                // for(int i = 0; i < lenTe; i++){
-                //     tmpValue[i] ^= server.testStr[i];
-                // }
-
-                // server.testStr = tmpValue;
-                // server.testStrLen = lentmp;
-
-                // serverLog(LL_NOTICE, "the tmpValue after update is %s", tmpValue);
-                // serverLog(LL_NOTICE, "the server.testStr after update is %s", server.testStr);
-                
                 break;
             }
 
             case PARITY_NOTIFY_DATANODE: 
+                serverLog(LL_NOTICE,"in the PARITY_NOTIFY_DATANODE");
+                
                 break;
 
             //case huifu;

@@ -5485,6 +5485,83 @@ void clusterRedirectClient(client *c, clusterNode *n, int hashslot, int error_co
          * a migration or import in progress. */
         addReplySds(c,sdsnew("-TRYAGAIN Multiple keys request during rehashing of slot\r\n"));
     } else if (error_code == CLUSTER_REDIR_DOWN_STATE) {
+
+# ifdef _ERASURE_CODE_
+#include "parity.h"
+#include "cluster.h"
+# include "./../deps/hiredis/hiredis.h"
+# include "./../deps/hiredis/read.h"
+    // 开始重启一个客户端 发送 key 和 flag 命令阶段就行
+    // 这里是不是应该不写这里？应该写db.c 插入到数据库之后，应该计算差值，实现value增量更新。
+    const char* parityip = "127.0.0.1";
+    const uint16_t port = 7002;
+     // 保证这个只执行一遍
+    serverLog(LL_NOTICE, "the server.port is %d and the port is %d", server.port, port);
+    if(server.port != port && !(server.cluster -> myself -> flags & CLUSTER_NODE_SLAVE)){ 
+        serverLog(LL_NOTICE, "the flags is  %d and the CLUSTER_NODE_SLAVE is %d", server.cluster -> myself -> flags, CLUSTER_NODE_SLAVE);
+        
+        serverLog(LL_NOTICE, "the hostip is %s, the server.port is %d and the port is %d", server.bindaddr, server.port, port);
+        redisContext *cl = redisConnect(parityip, port);
+        if (cl == NULL || cl->err) {
+            if (cl) {
+                serverLog(LL_NOTICE, "Error: %.40s", cl->errstr);
+            } else {
+                serverLog(LL_NOTICE, "Can't allocate redis context");
+            }
+        }
+    
+        redisReply *reply = NULL;
+
+        // 需要添加非set命令 如果那边解析到了
+        /*添加命令set */
+        char *sendStr = (char *) malloc(sizeof(char)*100);
+        memset(sendStr,0,sizeof(char)*100);
+
+        // set 
+        strcat(sendStr,"SET");
+        strcat(sendStr," ");
+
+        // key
+        addReplySds(c,sdsnew("-CLUSTERDOWN The cluster is down, and the client argv[1]\r\n"));
+        strcat(sendStr, (char*)c -> argv[1] -> ptr);
+        strcat(sendStr," ");
+
+        // flag 
+        char buf[32];
+        ll2string(buf,32,(long)PARITY_NOTIFY_DATANODE); // 需要校验节点通知其他节点发送cnt
+        strcat(sendStr,buf);
+        strcat(sendStr," ");
+
+        
+        // cnt
+        memset(buf, 0, sizeof(char) * 32);
+        dictEntry *entry = dictFind(server.KeyCntDict, c -> argv[1]->ptr);
+        serverLog(LL_NOTICE, "in the clusterFailed, the entry->stat_set_commands = %d", *(int *)entry->stat_set_commands);
+        ll2string(buf,32, *(int *)entry->stat_set_commands);
+        strcat(sendStr,buf);
+        strcat(sendStr," ");
+
+        // len
+        memset(buf, 0, sizeof(char) * 32);
+        const char* str = "parityXOR";
+        ll2string(buf,32, strlen(str));
+        strcat(sendStr,buf);
+        strcat(sendStr," ");
+
+        // xorvalue
+        strcat(sendStr, str);
+
+        serverLog(LL_NOTICE, "in the clusterFailed, the sendStr = %s",sendStr);
+
+        redisAppendCommand(c,sendStr);
+
+        /*获取set命令结果*/
+        redisGetReply(c,&reply); // reply for SET
+        serverLog(LL_NOTICE, "in the clusterFailed, the reply is %s", reply -> str);
+        freeReplyObject(reply);
+        redisFree(c);
+    }
+# endif
         addReplySds(c,sdsnew("-CLUSTERDOWN The cluster is down\r\n"));
     } else if (error_code == CLUSTER_REDIR_DOWN_UNBOUND) {
         addReplySds(c,sdsnew("-CLUSTERDOWN Hash slot not served\r\n"));
