@@ -1422,12 +1422,13 @@ void processInputBuffer(client *c) {
                 server.testStrLen = atoi((char*)(getDecodedObject(c -> argv[4]) -> ptr));
                 serverLog(LL_NOTICE,"in the PARITY_READ_BUFFER_AND_ENCODE, and the server.testStr is %s", server.testStr);
                 
-                insertKeyCntDict(c);
+                insertKeyCntDict(c);//更新key和cnt的hash表
+
                 if (processEncodeCommand(c) != C_OK){
                     serverLog(LL_NOTICE,"Process Encode error in processInputBuffer");
                 }
                 else{
-                    dictEntry *tmp = dictFindParity(c->db->dict,c->argv[3]->ptr);
+                    dictEntry *tmp = dictFindParity(server.parityDict,c->argv[3]->ptr);
                     if(tmp!=NULL){
                         serverLog(LL_NOTICE,"processEncodeCommand is OK, and the Entry:");
                         serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmp->stat_set_commands);
@@ -1447,7 +1448,7 @@ void processInputBuffer(client *c) {
                     serverLog(LL_NOTICE,"Process Update Parity error in processInputBuffer");
                 }
                 else{
-                    dictEntry *tmp = dictFindParity(c->db->dict,c->argv[3]->ptr);
+                    dictEntry *tmp = dictFindParity(server.parityDict,c->argv[3]->ptr);
                     if(tmp!=NULL){
                         serverLog(LL_NOTICE,"processUpdateParityCommand is OK, and the Entry:");
                         serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmp->stat_set_commands);

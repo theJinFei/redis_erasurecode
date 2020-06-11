@@ -1913,7 +1913,7 @@ void initServer(void) {
 
 # ifdef _ERASURE_CODE_
     server.cntflag = 0;
-
+    server.parityDict = dictCreate(&dbDictType, NULL);
     server.KeyCntDict = dictCreate(&dbDictType, NULL);
 # endif
     server.current_client = NULL;
@@ -2666,21 +2666,35 @@ int processEncodeCommand(client *c){
 
     //db = c->db;
     //dict = c->db->dict;
-    //key = c->agrv[1];
-    //flag = c->agrv[2];
+    //key = c->argv[1];
+    //flag = c->argrv[2];
     //cnt = c->argv[3];
     //val_len = c->argv[4];
     //val = c->argv[5];
 
-    if (dictFindParity(c->db->dict,c->argv[3]->ptr) == NULL) {
+    if (dictFindParity(server.parityDict,c->argv[3]->ptr) == NULL) {
         //全新的cnt，向hash表中插入key,val,cnt
         serverLog(LL_NOTICE,"dictFindParity is NULL and dbAddParity");
-        dbAddParity(c->db,c->argv[1],c->argv[5],c->argv[3],c->argv[4]);
+        //dbAddParity(c->db,c->argv[1],c->argv[5],c->argv[3],c->argv[4]);
+
+        sds copy = sdsdup(c->argv[3]->ptr);
+        int retval = dictAddParity(server.parityDict, copy, c->argv[1]->ptr, c->argv[5]->ptr, c->argv[4]->ptr);
+        if (server.cluster_enabled) slotToKeyAdd(c->argv[3]);
+
     } else {
         //已经有过的cnt
         //另一个data node的同cnt命令，做校验后插入
         serverLog(LL_NOTICE,"dictFindParity isn't NULL and dbOverwriteParity");
-        dbOverwriteParity(c->db, c->argv[1], c->argv[5], c->argv[3], c->argv[4]);
+        //dbOverwriteParity(c->db, c->argv[1], c->argv[5], c->argv[3], c->argv[4]);
+
+        dictEntry *de = dictFindParity(server.parityDict,c->argv[3]->ptr);
+        serverAssertWithInfo(NULL,c->argv[1],de != NULL);
+
+        //serverLog(LL_NOTICE,"in the dbOverwriteParity before, the key is %s",(char *)key->ptr);
+        //serverLog(LL_NOTICE,"in the dbOverwriteParity before, the val is %s",(char *)val->ptr);
+    
+        int flag = 1;
+        dictReplaceParity(server.parityDict, c->argv[3]->ptr, c->argv[1]->ptr, c->argv[5]->ptr, c->argv[4]->ptr, flag);
     }
 
     return C_OK;
@@ -2696,20 +2710,26 @@ int processUpdateParityCommand(client *c){
 
     //db = c->db;
     //dict = c->db->dict;
-    //key = c->agrv[1];
-    //flag = c->agrv[2];
+    //key = c->argv[1];
+    //flag = c->argv[2];
     //cnt = c->argv[3];
     //val_len = c->argv[4];
     //val = c->argv[5];
 
-    if (dictFindParity(c->db->dict,c->argv[3]->ptr) == NULL) {
+    if (dictFindParity(server.parityDict,c->argv[3]->ptr) == NULL) {
         serverLog(LL_NOTICE,"Error: int the UpdateParity, dictFindParity is NULL");
         return C_ERR;
     } else {
         //已经有过的cnt
         //另一个data node的同cnt命令，做校验后插入
         serverLog(LL_NOTICE,"dictFindParity isn't NULL and dbUpdateParity");
-        dbUpdateParity(c->db, c->argv[1], c->argv[5], c->argv[3], c->argv[4]);
+        //dbUpdateParity(c->db, c->argv[1], c->argv[5], c->argv[3], c->argv[4]);
+
+        dictEntry *de = dictFindParity(server.parityDict,c->argv[3]->ptr);
+        serverAssertWithInfo(NULL,c->argv[1],de != NULL);
+    
+        int flag = 2;
+        dictReplaceParity(server.parityDict, c->argv[3]->ptr, c->argv[1]->ptr, c->argv[5]->ptr, c->argv[4]->ptr, flag);
     }
 
     return C_OK;
