@@ -1913,6 +1913,8 @@ void initServer(void) {
 
 # ifdef _ERASURE_CODE_
     server.cntflag = 0;
+
+    server.KeyCntDict = dictCreate(&dbDictType, NULL);
 # endif
     server.current_client = NULL;
     server.clients = listCreate();
@@ -2626,6 +2628,33 @@ int processCommand(client *c) {
 
 
 #ifdef _ERASURE_CODE_
+void insertKeyCntDict(client* c)
+{
+    // robj* key = c -> argv[1];
+    // robj* cnt = c -> argv[3];
+
+    if (dictFind(server.KeyCntDict, c->argv[1]->ptr) == NULL) {
+        //全新的key 
+        serverLog(LL_NOTICE,"the KeyCntDict is NULL and insertKeyCntDict");
+        sds copy = sdsdup(c -> argv[1] -> ptr);
+
+        int retval = dictAddKeyCnt(server.KeyCntDict, copy, c -> argv[3] -> ptr);
+
+        dictEntry *tmp = dictFind(server.KeyCntDict,c->argv[1]->ptr);
+        if(tmp!=NULL){
+            serverLog(LL_NOTICE,"the insertKeyCntDict successfully ...");
+            serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmp->stat_set_commands);
+            serverLog(LL_NOTICE,"Entry->key: %s", (char*)tmp->key);
+        }
+    
+    } else {
+        //已经有过的key
+        serverLog(LL_NOTICE,"KeyCntDict isn't NULL and ");
+    }
+
+}
+
+
 // 将收到的消息写入校验节点 应该把key value插入到hash表中
 int processEncodeCommand(client *c){
     serverLog(LL_NOTICE,"in the processEncodeCommand");

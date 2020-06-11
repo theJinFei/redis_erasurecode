@@ -943,6 +943,7 @@ struct redisServer {
     dict *commands;             /* Command table */
 # ifdef _ERASURE_CODE_
     dict* parityDict;
+    dict* KeyCntDict;
 # endif
     dict *orig_commands;        /* Command table before command renaming. */
     aeEventLoop *el;
@@ -1718,6 +1719,7 @@ int freeMemoryIfNeeded(void);
 int processCommand(client *c);
 
 #ifdef _ERASURE_CODE_
+void insertKeyCntDict(client* c);
 int processEncodeCommand(client *c);
 int processUpdateParityCommand(client *c);
 void setParityEntry(redisDb *db, dictEntry *entry);

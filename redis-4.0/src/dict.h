@@ -175,6 +175,8 @@ int dictExpand(dict *d, unsigned long size);
 int dictAdd(dict *d, void *key, void *val);
 
 # ifdef _ERASURE_CODE_
+
+int dictAddKeyCnt(dict* d, void* key, void* cnt);
 int dictAddParity(dict *d, void *cnt, void *key, void *val, void *len);
 dictEntry *dictAddRawParity(dict *d, void *cnt, dictEntry **existing);
 dictEntry *dictFindParity(dict *d, const void *cnt);

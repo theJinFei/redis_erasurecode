@@ -300,6 +300,15 @@ int dictAdd(dict *d, void *key, void *val)
 }
 
 #ifdef _ERASURE_CODE_
+int dictAddKeyCnt(dict* d, void* key, void* cnt)
+{
+    dictEntry *entry = dictAddRaw(d,key,NULL);  
+
+    if (!entry) return DICT_ERR;
+    dictSetCnt(d, entry, cnt);
+    return DICT_OK;
+}
+
 int dictAddParity(dict *d, void *cnt, void *key, void *val, void *len){
     dictEntry *entry = dictAddRawParity(d,cnt,NULL);  
 

@@ -1422,6 +1422,9 @@ void processInputBuffer(client *c) {
                 server.testStrLen = atoi((char*)(getDecodedObject(c -> argv[4]) -> ptr));
                 serverLog(LL_NOTICE,"in the PARITY_READ_BUFFER_AND_ENCODE, and the server.testStr is %s", server.testStr);
                 
+                insertKeyCntDict(c);
+
+
                 if (processEncodeCommand(c) != C_OK){
                     serverLog(LL_NOTICE,"Process Encode error in processInputBuffer");
                 }
