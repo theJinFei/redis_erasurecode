@@ -942,8 +942,8 @@ struct redisServer {
     redisDb *db;
     dict *commands;             /* Command table */
 # ifdef _ERASURE_CODE_
-    dict* parityDict;
-    dict* KeyCntDict;
+    dict* parityDict;           /* parity data */
+    dict* KeyCntDict;           /* map key and cnt */
 # endif
     dict *orig_commands;        /* Command table before command renaming. */
     aeEventLoop *el;
@@ -1850,11 +1850,11 @@ int dbSyncDelete(redisDb *db, robj *key);
 int dbDelete(redisDb *db, robj *key);
 robj *dbUnshareStringValue(redisDb *db, robj *key, robj *o);
 
-# ifdef _ERASURE_CODE_
-void dbAddParity(redisDb *db, robj *key, robj *val, robj *cnt, robj *len);
-void dbOverwriteParity(redisDb *db, robj *key, robj *val, robj *cnt, robj *len);
-void dbUpdateParity(redisDb *db, robj *key, robj *val, robj *cnt, robj *len);
-# endif
+// # ifdef _ERASURE_CODE_
+// void dbAddParity(redisDb *db, robj *key, robj *val, robj *cnt, robj *len);
+// void dbOverwriteParity(redisDb *db, robj *key, robj *val, robj *cnt, robj *len);
+// void dbUpdateParity(redisDb *db, robj *key, robj *val, robj *cnt, robj *len);
+// # endif
 
 #define EMPTYDB_NO_FLAGS 0      /* No flags. */
 #define EMPTYDB_ASYNC (1<<0)    /* Reclaim memory in another thread. */
