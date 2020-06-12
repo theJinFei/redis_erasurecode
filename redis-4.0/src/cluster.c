@@ -5486,9 +5486,11 @@ void clusterRedirectClient(client *c, clusterNode *n, int hashslot, int error_co
         addReplySds(c,sdsnew("-TRYAGAIN Multiple keys request during rehashing of slot\r\n"));
     } else if (error_code == CLUSTER_REDIR_DOWN_STATE) {
         if(processRecoveryGet(c)==C_OK){
-            addReplySds(c,sdsnew("-CLUSTERDOWN The cluster is down but we can recovery for Get\r\n"));
+            serverLog(LL_NOTICE,"processRecoveryGet is C_OK");
+        }else{
+            serverLog(LL_NOTICE,"processRecoveryGet is C_ERROR");
         }
-        addReplySds(c,sdsnew("-CLUSTERDOWN The cluster is down\r\n"));
+        //addReplySds(c,sdsnew("-CLUSTERDOWN The cluster is down\r\n"));
     } else if (error_code == CLUSTER_REDIR_DOWN_UNBOUND) {
         addReplySds(c,sdsnew("-CLUSTERDOWN Hash slot not served\r\n"));
     } else if (error_code == CLUSTER_REDIR_MOVED ||
@@ -5597,13 +5599,20 @@ int processRecoveryGet(client *c){
         redisAppendCommand(cl,sendStr);
 
         /*获取set命令结果*/
-        redisReply *reply = calloc(1,sizeof(*reply));
-        reply->type = REDIS_REPLY_STRING;
-        redisGetReply(cl,&reply); // reply for Recovery
+        redisReply *reply;
+        redisGetReply(cl,(void **)&reply); // reply for Recovery
         serverLog(LL_NOTICE, "in the clusterFailed, after redisGetReply");
         serverLog(LL_NOTICE, "in the clusterFailed, the reply is %s", reply->str);
-        //freeReplyObject(reply);
-        //redisFree(c);
+        redisFree(cl);
+
+        //robj *val;
+        //val = createObject(OBJ_STRING, reply->str);
+        //serverLog(LL_NOTICE,"the recovery value is %s", (char*)val->ptr);
+        //addReplyBulk(c,val);
+
+        addReplyBulkCString(c,reply->str);
+
+        freeReplyObject(reply);
     }
     return C_OK;
 }

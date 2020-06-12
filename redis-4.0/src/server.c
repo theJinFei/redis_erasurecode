@@ -2745,18 +2745,15 @@ int processReplyGet(client *c){
 
     dictEntry *result = dictFindParity(server.parityDict,tmp->stat_set_commands);
     
-    // robj *val = dictGetVal(result);
-    // val->type = OBJ_STRING;
-    // robj *key = dictGetKey(result);
-    // robj *cnt = dictGetCnt(result);
+    //robj *val;
+    //val = createObject(OBJ_STRING,(char*)result->v.val);
 
-    serverLog(LL_NOTICE,"in the processReplyGet, result->value: %s", (char*)result->v.val);
-    // serverLog(LL_NOTICE,"in the processReplyGet, result->type: %d", val->type);
-    // serverLog(LL_NOTICE,"in the processReplyGet, result->type: %d", key->type);
-    // serverLog(LL_NOTICE,"in the processReplyGet, result->type: %d", cnt->type);
+    //serverLog(LL_NOTICE,"in the processReplyGet, result->value: %s", (char*)result->v.val);
+    //serverLog(LL_NOTICE,"in the processReplyGet, val->value: %s", (char*)val->ptr);
  
-    // addReplyBulk(c,val);
-    addReplyString(c,(char*)result->v.val,strlen((char*)result->v.val));
+    //addReplyBulk(c,val);
+
+    addReplyBulkCString(c, (char*)result->v.val);
 
     return C_OK;
 }

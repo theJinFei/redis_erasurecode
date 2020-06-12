@@ -1377,11 +1377,14 @@ void processInputBuffer(client *c) {
 
 # ifdef _ERASURE_CODE_
 #include "parity.h"
+
+        int parity_flag = 0;
+
         // 这个时候 其实命令就已经解析出来了
         // 如果解析的命令中包含的flag是parity定义的类型的话
         // 进行命令解析
         // 不等于normal 就直接跳转 走parity的几个函数即可
-        if(c -> argc >= 6 && (strcmp((char *)(c -> argv[2] -> ptr), "9") || strcmp((char *)(c -> argv[2] -> ptr), "2"))){     // 增加槽 也会走这个if条件 需要判断第一个是不是SET
+        if(c -> argc >= 6 && (strcmp((char *)(c -> argv[2] -> ptr), "9") || strcmp((char *)(c -> argv[2] -> ptr), "2") || strcmp((char *)(c -> argv[2] -> ptr), "3"))){     // 增加槽 也会走这个if条件 需要判断第一个是不是SET
 
             // set key flag cnt len pairtyXOR
             for(int i = 0; i < c -> argc; i++){
@@ -1405,9 +1408,7 @@ void processInputBuffer(client *c) {
             char* diffLen = (char*)(getDecodedObject(c -> argv[4]) -> ptr);
             serverLog(LL_NOTICE,"the diffLen is %d", atoi(diffLen));
 
-            // for(int i = 0; i < atoi(diffLen); i++){
-            //     serverLog(LL_NOTICE, "the NO.%d diff is %c", i, diff[i]);
-            // }
+            //serverLog(LL_NOTICE,"the client is: %s", )
 
             switch(e[0] - '0'){
             case PARITY_NORMAL_PROCESS: 
@@ -1435,10 +1436,26 @@ void processInputBuffer(client *c) {
                         serverLog(LL_NOTICE,"Entry->key: %s", (char*)tmp->key);
                         serverLog(LL_NOTICE,"Entry->val: %s", (char*)tmp->v.val);
                         serverLog(LL_NOTICE,"Entry->val_len: %s", (char*)tmp->val_len);
+
+                        addReplyBulk(c,c->argv[5]); 
+
+                        // if (c->flags & CLIENT_MASTER && !(c->flags & CLIENT_MULTI)) {
+                        //     /* Update the applied replication offset of our master. */
+                        //     c->reploff = c->read_reploff - sdslen(c->querybuf);
+                        // }
+
+                        // /* Don't reset the client structure for clients blocked in a
+                        // * module blocking command, so that the reply callback will
+                        // * still be able to access the client argv and argc field.
+                        // * The client will be reset in unblockClientFromModule(). */
+                        // if (!(c->flags & CLIENT_BLOCKED) || c->btype != BLOCKED_MODULE){
+                        //        resetClient(c);
+                        // }
+                        parity_flag = 1;
                     }
                     else{
                         serverLog(LL_NOTICE,"The entry is empty");
-                    }       
+                    }   
                 }
                 break;
 
@@ -1455,6 +1472,8 @@ void processInputBuffer(client *c) {
                         serverLog(LL_NOTICE,"Entry->key: %s", (char*)tmp->key);
                         serverLog(LL_NOTICE,"Entry->val: %s", (char*)tmp->v.val);
                         serverLog(LL_NOTICE,"Entry->val_len: %s", (char*)tmp->val_len);
+                        addReplyBulk(c,c->argv[5]);   
+                        parity_flag = 1;
                     }
                     else{
                         serverLog(LL_NOTICE,"The entry is empty");
@@ -1472,17 +1491,22 @@ void processInputBuffer(client *c) {
                 }
                 else{
                     serverLog(LL_NOTICE,"need to send the result to client");
+                    //addReplySds(c,"processReplyGet is ok");  
+                    parity_flag = 1;
                 }
-                return;
+                break;
 
             //case huifu;
             default :
                 serverLog(LL_NOTICE,"this is networking's default, and the o -> flag is %d", e[0] - '0');
             }
 
-    }
-        
+        }  
 # endif
+
+        if(parity_flag == 1){
+            continue;
+        }
 
         /* Multibulk processing could see a <= 0 length. */
         if (c->argc == 0) {
@@ -1507,7 +1531,8 @@ void processInputBuffer(client *c) {
              * freed. */
             if (server.current_client == NULL) break;
         }
-    }
+
+    }//while循环
     server.current_client = NULL;
 }
 

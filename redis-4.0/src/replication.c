@@ -383,9 +383,11 @@ void feedParityARGV(client *cl, const int argc, robj** argv){
 
         serverLog(LL_NOTICE, "before sendStr = %s",sendStr);
 
-        //redisAppendCommand(c,"set foo bar 1");
+        // redisAppendCommand(c,"set foo bar 1");
         // set key flag cnt len value
         redisAppendCommand(c,sendStr);
+
+        //redisAppendCommand(c,"set foo bar");
 
         //serverLog(LL_NOTICE, "after redisAppendCommand, the server.stat_numsetcommands = %d", server.stat_numsetcommands);
 
@@ -395,7 +397,7 @@ void feedParityARGV(client *cl, const int argc, robj** argv){
         // redisAppendCommand(c,"GET foo2");
         /*获取set命令结果*/
         redisGetReply(c,&reply); // reply for SET
-        serverLog(LL_NOTICE, "the reply is %s", reply -> str);
+        serverLog(LL_NOTICE, "in the feedParityARGV, the reply is %s", reply -> str);
         freeReplyObject(reply);
         redisFree(c);
 
@@ -469,7 +471,7 @@ void feedParityXOR(client* cl, const char* parityXOR)
         // redisAppendCommand(c,"GET foo2");
         /*获取set命令结果*/
         redisGetReply(c,&reply); // reply for SET
-        serverLog(LL_NOTICE, "the reply is %s", reply -> str);
+        serverLog(LL_NOTICE, "in the feedParityXOR, the reply is %s", reply -> str);
         freeReplyObject(reply);
         redisFree(c);
         // serverLog(LL_NOTICE, "the message has already sended .... ");
@@ -495,7 +497,7 @@ void feedParityXORLen(client *cl, const char* parityXOR, int len){
             }
         }
     
-        redisReply *reply = NULL;
+        redisReply *reply;
 
 
         // 需要添加非set命令 如果那边解析到了
@@ -564,7 +566,7 @@ void feedParityXORLen(client *cl, const char* parityXOR, int len){
 
         /*获取set命令结果*/
         redisGetReply(c,&reply); // reply for SET
-        serverLog(LL_NOTICE, "the reply is %s", reply -> str);
+        serverLog(LL_NOTICE, "in the feedParityXORLen, the reply is %s", reply -> str);
         freeReplyObject(reply);
         redisFree(c);
 
