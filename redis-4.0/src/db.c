@@ -171,14 +171,37 @@ robj *lookupKeyWriteOrReply(client *c, robj *key, robj *reply) {
  * The program is aborted if the key already exists. */
 void dbAdd(redisDb *db, robj *key, robj *val) {
     sds copy = sdsdup(key->ptr);
+    serverLog(LL_NOTICE,"in the dbAdd, before the dictAddCntKey and the key is %s",copy);
+
     int retval = dictAdd(db->dict, copy, val);
+
+# ifdef _ERASURE_CODE_
+    char *tmpCnt = (char *) malloc(sizeof(char)*32);
+    ll2string(tmpCnt,32, (long)server.stat_numsetcommands); 
+    serverLog(LL_NOTICE,"in the dbAdd, before the dictAddCntKey and the tmpCnt is %s",tmpCnt);
+
+    robj *tmp = createObject(OBJ_STRING, tmpCnt);
+    serverLog(LL_NOTICE,"in the dbAdd, before the dictAddCntKey and the tmp is %s",(char *)tmp->ptr);
+
+    sds copyCnt = sdsdup(tmp->ptr);
+    serverLog(LL_NOTICE,"in the dbAdd, before the dictAddCntKey and the tmpCnt is %s",copyCnt);
+
+    if(dictAddParity(server.CntKeyDict, copyCnt, copy, NULL, NULL)==C_OK){
+        serverLog(LL_NOTICE,"in the dbAdd, the dictAddCntKey is C_OK");
+    }
+    else{
+        serverLog(LL_NOTICE,"in the dbAdd, the dictAddCntKey is C_ERROR");
+    }
+    free(tmpCnt);
+# endif
+
 
     serverAssertWithInfo(NULL,key,retval == DICT_OK);
     if (val->type == OBJ_LIST) signalListAsReady(db, key);
     if (server.cluster_enabled) slotToKeyAdd(key);
  }
 
-// #ifdef _ERASURE_CODE_
+#ifdef _ERASURE_CODE_
 // void dbAddParity(redisDb *db, robj *key, robj *val, robj *cnt, robj *len){
 //     sds copy = sdsdup(cnt->ptr);
 
@@ -188,7 +211,49 @@ void dbAdd(redisDb *db, robj *key, robj *val) {
     
 //     if (server.cluster_enabled) slotToKeyAdd(cnt);
 // }
-// #endif
+
+void dbRecovery(redisDb *db, dictEntry *de, sds key, sds value){
+    // 恢复key
+    int lenKeyOld=strlen(key);//新key, 7001.key
+    int lenKeyNew=strlen((char*)de->key);//旧key, 7002.key
+
+    int lenkeytmp = (lenKeyOld>lenKeyNew)?lenKeyOld:lenKeyNew;
+
+    char *tmpKey = (char *)malloc(lenkeytmp*sizeof(char));
+    memset(tmpKey,0,(sizeof(char))*lenkeytmp);
+
+    for(int i = 0; i < lenKeyOld; i++){
+        tmpKey[i] ^= key[i];
+    }
+    for(int i = 0; i < lenKeyNew; i++){
+        tmpKey[i] ^= ((char*)de->key)[i];
+    }
+
+    serverLog(LL_NOTICE,"before Set Recovery Key, the tmpKey is %s",tmpKey);
+    
+    // 恢复value
+    int lenValNew = strlen(value);//新value, 7001.value
+    int lenValOld = atoi((char*)de->val_len);//旧value, 7002.value
+
+    int lenvaltmp = (lenValOld>lenValNew)?lenValOld:lenValNew;
+
+    char *tmpValue = (char *)malloc(lenvaltmp*sizeof(char));
+    memset(tmpValue,0,(sizeof(char))*lenvaltmp);
+
+    for(int i = 0; i < lenValOld; i++){
+        tmpValue[i] ^= ((char*)de->v.val)[i];
+    }
+    for(int i = 0; i < lenValNew; i++){
+        tmpValue[i] ^= value[i];
+    }
+
+    serverLog(LL_NOTICE, "before Set Recovery Value, the tmpValue is %s", tmpValue);
+
+    // 插入hash表
+    dictAddRecovery(db->dict, tmpKey, tmpValue, de->stat_set_commands);
+}
+
+#endif
 
 
 #ifdef USE_PMDK
@@ -286,6 +351,17 @@ void setKey(redisDb *db, robj *key, robj *val) {
 # endif
         dbAdd(db,key,val);
         //set, diff=val
+        
+// # ifdef _ERASURE_CODE_
+//         char *tmpCnt = (char *) malloc(sizeof(char)*32);
+//         ll2string(tmpCnt,32, (long)server.stat_numsetcommands++);
+
+//         char *tmpKey = (char *) malloc(sizeof(char)*32);
+//         strcpy(tmpKey,(char *)key->ptr);
+
+        
+//         dictAddCntKey(server.CntKeyDict, tmpKey, tmpCnt);
+// # endif
 
     } else {
         dbOverwrite(db,key,val);

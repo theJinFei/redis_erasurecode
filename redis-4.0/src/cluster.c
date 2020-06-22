@@ -5485,11 +5485,21 @@ void clusterRedirectClient(client *c, clusterNode *n, int hashslot, int error_co
          * a migration or import in progress. */
         addReplySds(c,sdsnew("-TRYAGAIN Multiple keys request during rehashing of slot\r\n"));
     } else if (error_code == CLUSTER_REDIR_DOWN_STATE) {
-        if(processRecoveryGet(c)==C_OK){
-            serverLog(LL_NOTICE,"processRecoveryGet is C_OK");
-        }else{
-            serverLog(LL_NOTICE,"processRecoveryGet is C_ERROR");
+        const uint16_t parity_port = 7002;
+        const char* parityip = "127.0.0.1";
+        if(server.port == parity_port){
+            serverLog(LL_NOTICE,"in the cluster, before the processReplyGet, in 7002");
+            processReplyGet(c);
         }
+        else{
+            addReplySds(c,sdscatprintf(sdsempty(),
+            "-%s %d %s:%d\r\n", "MOVED", hashslot, parityip, parity_port));
+        }
+        // if(processRecoveryGet(c)==C_OK){
+        //     serverLog(LL_NOTICE,"processRecoveryGet is C_OK");
+        // }else{
+        //     serverLog(LL_NOTICE,"processRecoveryGet is C_ERROR");
+        // }
         //addReplySds(c,sdsnew("-CLUSTERDOWN The cluster is down\r\n"));
     } else if (error_code == CLUSTER_REDIR_DOWN_UNBOUND) {
         addReplySds(c,sdsnew("-CLUSTERDOWN Hash slot not served\r\n"));

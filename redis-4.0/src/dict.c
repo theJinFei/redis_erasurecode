@@ -296,6 +296,9 @@ int dictAdd(dict *d, void *key, void *val)
 
     if (!entry) return DICT_ERR;
     dictSetVal(d, entry, val);
+    // serverLog(LL_NOTICE,"in the dictAdd, Entry->cnt: %s", entry->stat_set_commands);
+    // serverLog(LL_NOTICE,"in the dictAdd, Entry->key: %s", entry->key);
+    // serverLog(LL_NOTICE,"in the dictAdd, Entry->key: %s", entry->v.val);
     return DICT_OK;
 }
 
@@ -306,6 +309,20 @@ int dictAddKeyCnt(dict* d, void* key, void* cnt)
 
     if (!entry) return DICT_ERR;
     dictSetCnt(d, entry, cnt);
+    return DICT_OK;
+}
+
+int dictAddCntKey(dict* d, void* key, void* cnt)
+{
+    dictEntry *entry = dictAddRawParity(d,cnt,NULL);  ;  
+
+    if (!entry) return DICT_ERR;
+    dictSetKey(d, entry, key);
+
+    serverLog(LL_NOTICE,"in the dictAddCntKey, the entry is:");
+    serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)entry->stat_set_commands);
+    serverLog(LL_NOTICE,"Entry->key: %s", (char *)entry->key);
+
     return DICT_OK;
 }
 
@@ -326,6 +343,15 @@ int dictAddParity(dict *d, void *cnt, void *key, void *val, void *len){
 
     dictSetLen(d, entry, len);
 
+    return DICT_OK;
+}
+
+int dictAddRecovery(dict *d, void *key, void *val, void *cnt){
+    dictEntry *entry = dictAddRaw(d, key, NULL);  
+
+    if (!entry) return DICT_ERR;
+    dictSetVal(d, entry, val);
+    dictSetCnt(d, entry, cnt);
     return DICT_OK;
 }
 #endif
@@ -400,14 +426,23 @@ dictEntry *dictAddRawParity(dict *d, void *cnt, dictEntry **existing){
 
     /* Get the index of the new element, or -1 if
      * the element already exists. */
-    if ((index = _dictKeyIndexParity(d, cnt, dictHashKey(d,cnt), existing)) == -1)
+    if ((index = _dictKeyIndexParity(d, cnt, dictHashKey(d,cnt), existing)) == -1){
+        serverLog(LL_NOTICE,"in the dictAddRawParity, the element already exists");
         return NULL;
+    }
+        
+
+    
+    //serverLog(LL_NOTICE,"in the dictAddRawParity, the h = %d",dictHashKey(d,cnt));
 
     /* Allocate the memory and store the new entry.
      * Insert the element in top, with the assumption that in a database
      * system it is more likely that recently added entries are accessed
      * more frequently. */
     ht = dictIsRehashing(d) ? &d->ht[1] : &d->ht[0];
+
+    //serverLog(LL_NOTICE,"in the dictAddRawParity, idx = %d", (dictHashKey(d,cnt)) & (ht->sizemask));
+
     entry = zmalloc(sizeof(*entry));
 
     entry->next = ht->table[index];
@@ -784,15 +819,31 @@ dictEntry *dictFindParity(dict *d, const void *cnt){
     dictEntry *he;
     uint64_t h, idx, table;
 
-    if (d->ht[0].used + d->ht[1].used == 0) return NULL; /* dict is empty */
+    if (d->ht[0].used + d->ht[1].used == 0) {
+        //serverLog(LL_NOTICE,"in the dictFindParity, d->ht[0].used + d->ht[1].used == 0");
+        return NULL; /* dict is empty */
+    }
     if (dictIsRehashing(d)) _dictRehashStep(d);
     h = dictHashKey(d, cnt);
+    //serverLog(LL_NOTICE,"in the dictFindParity, h = %d", h);
+
     for (table = 0; table <= 1; table++) {
         idx = h & d->ht[table].sizemask;
+        //serverLog(LL_NOTICE,"in the dictFindParity, idx = %d", idx);
         he = d->ht[table].table[idx];
+        if(he == NULL){
+            //serverLog(LL_NOTICE,"in the dictFindParity, he is NULL");
+        }else{
+            //serverLog(LL_NOTICE,"in the dictFindParity, before the while(he), the he->stat_set_commands is %s", (char *)he->stat_set_commands);
+        }        
         while(he) {
-            if (cnt==he->stat_set_commands || dictCompareKeys(d, cnt, he->stat_set_commands))
+            //serverLog(LL_NOTICE,"in the dictFindParity, the cnt is %s", (char *)cnt);
+            //serverLog(LL_NOTICE,"in the dictFindParity, the he->stat_set_commands is %s", (char *)he->stat_set_commands);
+            if (cnt==he->stat_set_commands || dictCompareKeys(d, cnt, he->stat_set_commands)){
+                //serverLog(LL_NOTICE,"in the dictFindParity and while(he), find the he");
                 return he;
+            }  
+            //serverLog(LL_NOTICE,"in the dictFindParity and while(he), didn't find the he");
             he = he->next;
         }
         if (!dictIsRehashing(d)) return NULL;

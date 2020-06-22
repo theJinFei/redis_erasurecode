@@ -178,10 +178,12 @@ int dictAdd(dict *d, void *key, void *val);
 # ifdef _ERASURE_CODE_
 
 int dictAddKeyCnt(dict* d, void* key, void* cnt);
+int dictAddCntKey(dict* d, void* key, void* cnt);
 int dictAddParity(dict *d, void *cnt, void *key, void *val, void *len);
 dictEntry *dictAddRawParity(dict *d, void *cnt, dictEntry **existing);
 dictEntry *dictFindParity(dict *d, const void *cnt);
 int dictReplaceParity(dict *d, void *cnt, void *key, void *val, void *len, int flag);
+int dictAddRecovery(dict *d, void *key, void *val, void *cnt);
 # endif
 
 dictEntry *dictAddRaw(dict *d, void *key, dictEntry **existing);

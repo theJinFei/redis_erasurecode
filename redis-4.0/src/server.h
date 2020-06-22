@@ -58,6 +58,8 @@
 
 #ifdef _ERASURE_CODE_
 #include "parity.h"
+#include "./../deps/hiredis/hiredis.h"
+#include "./../deps/hiredis/read.h"
 #endif
 
 #ifdef USE_PMDK
@@ -944,6 +946,7 @@ struct redisServer {
 # ifdef _ERASURE_CODE_
     dict* parityDict;           /* parity data */
     dict* KeyCntDict;           /* map key and cnt */
+    dict* CntKeyDict;           /* map key and cnt */
 # endif
     dict *orig_commands;        /* Command table before command renaming. */
     aeEventLoop *el;
@@ -1725,6 +1728,9 @@ int processUpdateParityCommand(client *c);
 void setParityEntry(redisDb *db, dictEntry *entry);
 
 int processReplyGet(client *c);
+int processRecoverySignalData(client *c);
+
+int processRecoveryAll(client *c);
 #endif
 
 void setupSignalHandlers(void);
@@ -1852,11 +1858,12 @@ int dbSyncDelete(redisDb *db, robj *key);
 int dbDelete(redisDb *db, robj *key);
 robj *dbUnshareStringValue(redisDb *db, robj *key, robj *o);
 
-// # ifdef _ERASURE_CODE_
+# ifdef _ERASURE_CODE_
 // void dbAddParity(redisDb *db, robj *key, robj *val, robj *cnt, robj *len);
 // void dbOverwriteParity(redisDb *db, robj *key, robj *val, robj *cnt, robj *len);
 // void dbUpdateParity(redisDb *db, robj *key, robj *val, robj *cnt, robj *len);
-// # endif
+void dbRecovery(redisDb *db, dictEntry *de, sds key, sds value);
+# endif
 
 #define EMPTYDB_NO_FLAGS 0      /* No flags. */
 #define EMPTYDB_ASYNC (1<<0)    /* Reclaim memory in another thread. */

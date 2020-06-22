@@ -45,11 +45,12 @@
 
 // DECODE
 # define PARITY_NOTIFY_DATANODE 3   // 校验节点 通知其他数据节点 启动恢复
-# define PARIYT_DATANODE_TRANSFORM_DATA 4  // 数据节点 收到这个标志 表示要传输特定位置的数据
-# define PARIYT_READ_BUFFER_AND_DECODE 5 // 校验节点 收到标志 表示读缓冲区 进行解码
+# define PARIYT_DATANODE_TRANSFORM_VALUE 4  // 数据节点 收到这个标志 表示要传输特定位置的Value
+# define PARIYT_DATANODE_TRANSFORM_DATA 5  // 数据节点 收到这个标志 表示要传输特定位置的Key and Value
+# define PARIYT_READ_BUFFER_AND_DECODE 6 // 校验节点 收到标志 表示读缓冲区 进行解码
 
 // 传输给故障节点
-# define PARITY_TRANFORM_GOOD_DATA 6   // 校验节点传输恢复好的数据 然后故障节点进行重新读缓冲区即可
+# define PARITY_TRANFORM_GOOD_DATA 7   // 校验节点传输恢复好的数据 然后故障节点进行重新读缓冲区即可
 
 # endif
 

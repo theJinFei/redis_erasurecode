@@ -1380,11 +1380,27 @@ void processInputBuffer(client *c) {
 
         int parity_flag = 0;
 
+        if(strcmp((char *)(c -> argv[0] -> ptr), "recovery") == 0){
+            if(processRecoveryAll(c) == C_OK){
+                serverLog(LL_NOTICE,"processRecoveryAll is OK");
+                parity_flag = 1;
+            }
+            else{
+                serverLog(LL_NOTICE,"Error: processRecoveryAll is error");
+            }
+
+        }
+
+
         // 这个时候 其实命令就已经解析出来了
         // 如果解析的命令中包含的flag是parity定义的类型的话
         // 进行命令解析
         // 不等于normal 就直接跳转 走parity的几个函数即可
-        if(c -> argc >= 6 && (strcmp((char *)(c -> argv[2] -> ptr), "9") || strcmp((char *)(c -> argv[2] -> ptr), "2") || strcmp((char *)(c -> argv[2] -> ptr), "3"))){     // 增加槽 也会走这个if条件 需要判断第一个是不是SET
+        if(c -> argc >= 6 && (!strcmp((char *)(c -> argv[2] -> ptr), "9") || 
+                !strcmp((char *)(c -> argv[2] -> ptr), "2") || 
+                !strcmp((char *)(c -> argv[2] -> ptr), "3") ||
+                !strcmp((char *)(c -> argv[2] -> ptr), "4") ||
+                !strcmp((char *)(c -> argv[2] -> ptr), "5") )){     // 增加槽 也会走这个if条件 需要判断第一个是不是SET
 
             // set key flag cnt len pairtyXOR
             for(int i = 0; i < c -> argc; i++){
@@ -1408,7 +1424,7 @@ void processInputBuffer(client *c) {
             char* diffLen = (char*)(getDecodedObject(c -> argv[4]) -> ptr);
             serverLog(LL_NOTICE,"the diffLen is %d", atoi(diffLen));
 
-            //serverLog(LL_NOTICE,"the client is: %s", )
+            dictEntry *tmp = NULL;
 
             switch(e[0] - '0'){
             case PARITY_NORMAL_PROCESS: 
@@ -1426,10 +1442,10 @@ void processInputBuffer(client *c) {
                 insertKeyCntDict(c);//更新key和cnt的hash表
 
                 if (processEncodeCommand(c) != C_OK){
-                    serverLog(LL_NOTICE,"Process Encode error in processInputBuffer");
+                    serverLog(LL_NOTICE,"Process Encode error in processEncodeCommand");
                 }
                 else{
-                    dictEntry *tmp = dictFindParity(server.parityDict,c->argv[3]->ptr);
+                    tmp = dictFindParity(server.parityDict,c->argv[3]->ptr);
                     if(tmp!=NULL){
                         serverLog(LL_NOTICE,"processEncodeCommand is OK, and the Entry:");
                         serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmp->stat_set_commands);
@@ -1438,19 +1454,6 @@ void processInputBuffer(client *c) {
                         serverLog(LL_NOTICE,"Entry->val_len: %s", (char*)tmp->val_len);
 
                         addReplyBulk(c,c->argv[5]); 
-
-                        // if (c->flags & CLIENT_MASTER && !(c->flags & CLIENT_MULTI)) {
-                        //     /* Update the applied replication offset of our master. */
-                        //     c->reploff = c->read_reploff - sdslen(c->querybuf);
-                        // }
-
-                        // /* Don't reset the client structure for clients blocked in a
-                        // * module blocking command, so that the reply callback will
-                        // * still be able to access the client argv and argc field.
-                        // * The client will be reset in unblockClientFromModule(). */
-                        // if (!(c->flags & CLIENT_BLOCKED) || c->btype != BLOCKED_MODULE){
-                        //        resetClient(c);
-                        // }
                         parity_flag = 1;
                     }
                     else{
@@ -1465,7 +1468,7 @@ void processInputBuffer(client *c) {
                     serverLog(LL_NOTICE,"Process Update Parity error in processInputBuffer");
                 }
                 else{
-                    dictEntry *tmp = dictFindParity(server.parityDict,c->argv[3]->ptr);
+                    tmp = dictFindParity(server.parityDict,c->argv[3]->ptr);
                     if(tmp!=NULL){
                         serverLog(LL_NOTICE,"processUpdateParityCommand is OK, and the Entry:");
                         serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmp->stat_set_commands);
@@ -1484,19 +1487,89 @@ void processInputBuffer(client *c) {
 
             case PARITY_NOTIFY_DATANODE: 
                 serverLog(LL_NOTICE,"in the PARITY_NOTIFY_DATANODE");
-                //addReply(c,shared.noautherr);
 
                 if(processReplyGet(c)!=C_OK){
                     serverLog(LL_NOTICE,"processStartReGet is Error");
                 }
                 else{
                     serverLog(LL_NOTICE,"need to send the result to client");
-                    //addReplySds(c,"processReplyGet is ok");  
                     parity_flag = 1;
                 }
                 break;
 
-            //case huifu;
+            case PARIYT_DATANODE_TRANSFORM_VALUE:
+                serverLog(LL_NOTICE,"in the PARIYT_DATANODE_TRANSFORM_VALUE");
+
+                tmp = dictFindParity(server.parityDict, c->argv[3]->ptr);
+                addReplyBulkCString(c, (char *)tmp->v.val);
+                serverLog(LL_NOTICE,"the 7001.value is %s", (char *)tmp->v.val);
+
+                parity_flag = 1;
+                break;
+
+            case PARIYT_DATANODE_TRANSFORM_DATA:
+                serverLog(LL_NOTICE,"in the PARIYT_DATANODE_TRANSFORM_DATA");
+
+                serverLog(LL_NOTICE,"before the dictFindParity, the cnt is %s",(char *)c->argv[3]->ptr);
+                serverLog(LL_NOTICE,"before the dictFindParity, the cnt type is %d",c->argv[3]->type);
+
+                dictIterator *di;
+                dictEntry *de;
+
+                di = dictGetSafeIterator(server.CntKeyDict);
+                while((de = dictNext(di)) != NULL) {
+                    serverLog(LL_NOTICE,"in the dictIterator of CntKeyDict, Entry->cnt: %s", (char *)de->stat_set_commands);
+                    serverLog(LL_NOTICE,"in the dictIterator of CntKeyDict, Entry->key: %s", (char *)de->key);
+                }
+
+                char *tmpCnt = (char *) malloc(sizeof(char)*32);
+                strcpy(tmpCnt, (char *)c->argv[3]->ptr);
+                dictEntry *tmpKey = dictFindParity(server.CntKeyDict, tmpCnt);
+                if(tmpKey!=NULL){
+                    serverLog(LL_NOTICE,"in the PARIYT_DATANODE_TRANSFORM_DATA, and the tmpKey Entry:");
+                    serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmpKey->stat_set_commands);
+                    serverLog(LL_NOTICE,"Entry->key: %s", (char *)tmpKey->key);
+                }
+                else{
+                    serverLog(LL_NOTICE,"The tmpKey entry is empty");
+                } 
+
+                di = dictGetSafeIterator(server.db->dict);
+                while((de = dictNext(di)) != NULL) {
+                    serverLog(LL_NOTICE,"in the dictIterator of server.db->dict, Entry->cnt: %s", (char *)de->stat_set_commands);
+                    serverLog(LL_NOTICE,"in the dictIterator of server.db->dict, Entry->key: %s", (char *)de->key);
+                    serverLog(LL_NOTICE,"in the dictIterator of server.db->dict, Entry->val: %s", (char *)de->v.val);
+                }
+
+                tmp = dictFind(c->db->dict, tmpKey->key);
+                if(tmp!=NULL){
+                    serverLog(LL_NOTICE,"in the PARIYT_DATANODE_TRANSFORM_DATA, and the tmp Entry:");
+                    robj *val = dictGetVal(tmp);
+                    //serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmp->stat_set_commands);
+                    serverLog(LL_NOTICE,"Entry->key: %s", (char*)tmp->key);
+                    serverLog(LL_NOTICE,"Entry->val: %s", (char *)(getDecodedObject(val) -> ptr));
+                    //serverLog(LL_NOTICE,"Entry->val: %s", (char*)tmp->v.val);
+                    //serverLog(LL_NOTICE,"Entry->val_len: %s", (char*)tmp->val_len);
+                }
+                else{
+                    serverLog(LL_NOTICE,"The tmp entry is empty");
+                }  
+
+                // robj *o = lookupKeyRead(c->db, key); 
+
+
+                char *sendStr = (char *) malloc(sizeof(char)*100);
+                memset(sendStr,0,sizeof(char)*100);
+                strcat(sendStr, (char *)tmp->key);
+                strcat(sendStr, "\r\n");
+                strcat(sendStr, (char *)(getDecodedObject(dictGetVal(tmp)) -> ptr));
+                
+                serverLog(LL_NOTICE,"the 7001.key and 7001.value is %s", sendStr);
+                addReplyBulkCString(c, sendStr);
+
+                parity_flag = 1;
+                break;
+
             default :
                 serverLog(LL_NOTICE,"this is networking's default, and the o -> flag is %d", e[0] - '0');
             }

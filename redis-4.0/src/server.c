@@ -1575,9 +1575,9 @@ void initServerConfig(void) {
     server.commands = dictCreate(&commandTableDictType,NULL);
 
 # ifdef _ERASURE_CODE_
-    server.parityDict = dictCreate(&dbDictTypePairty, NULL);
-    server.testStr=NULL;
-    server.testStrLen = 0;
+    //server.parityDict = dictCreate(&dbDictTypePairty, NULL);
+    //server.testStr=NULL;
+    //server.testStrLen = 0;
     //server.parityValue=NULL;
 # endif
 
@@ -1915,6 +1915,7 @@ void initServer(void) {
     server.cntflag = 0;
     server.parityDict = dictCreate(&dbDictType, NULL);
     server.KeyCntDict = dictCreate(&dbDictType, NULL);
+    server.CntKeyDict = dictCreate(&dbDictType, NULL);
 # endif
     server.current_client = NULL;
     server.clients = listCreate();
@@ -2736,28 +2737,197 @@ int processUpdateParityCommand(client *c){
 }
 
 int processReplyGet(client *c){
-    //key = c->argv[1]
-    dictEntry *tmp = dictFind(server.KeyCntDict,c->argv[1]->ptr);
-    if(tmp!=NULL){
-        serverLog(LL_NOTICE,"in the processReplyGet, Entry->cnt: %s", (char *)tmp->stat_set_commands);
-        serverLog(LL_NOTICE,"in the processReplyGet, Entry->key: %s", (char*)tmp->key);
+    //先按key查找哈希表
+    dictEntry *de = dictFind(server.db->dict, c->argv[1]->ptr);
+    //dictEntry *tmp = dictFind(server.KeyCntDict, c->argv[1]->ptr);
+    //dictEntry *de = dictFindParity(server.parityDict, tmp->stat_set_commands);
+    if(de){
+        //找到，直接回复value
+        serverLog(LL_NOTICE,"find the key in the server.db->dict, and return value directly");
+        addReplyBulkCString(c, (char*)de->v.val);
+        return C_OK;
+    }
+    else{
+        //没找到，通知其他数据结点开始恢复
+        serverLog(LL_NOTICE,"didn't find the key in the server.db->dict, need to recovery");
+        //addReplyBulkCString(c, "in the process of recovery...");
+        if(processRecoverySignalData(c)==C_OK){
+            return C_OK;
+        }
+        else{
+            return C_ERR;
+        }
+    }
+}
+
+int processRecoverySignalData(client *c){
+    const char* parityip = "127.0.0.1";
+    const uint16_t port = 7001;
+
+    redisContext *cl = redisConnect(parityip, port);
+
+    char *sendStr = (char *) malloc(sizeof(char)*100);
+    memset(sendStr,0,sizeof(char)*100);
+
+    // set 
+    strcat(sendStr,"SET ");
+
+    // key
+    strcat(sendStr,"key ");
+
+    // flag 
+    char buf[32];
+    ll2string(buf,32,(long)PARIYT_DATANODE_TRANSFORM_DATA); //通知其他数据结点节点发送value
+    strcat(sendStr,buf);
+    strcat(sendStr," ");
+    
+    // cnt
+    memset(buf, 0, sizeof(char) * 32);
+    dictEntry *entry = dictFind(server.KeyCntDict, c -> argv[1]->ptr);
+    strcat(sendStr,(char *)entry->stat_set_commands);
+    strcat(sendStr," ");
+    
+    // len
+    memset(buf, 0, sizeof(char) * 32);
+    const char* str = "parityXOR";
+    ll2string(buf,32, strlen(str));
+    strcat(sendStr,buf);
+    strcat(sendStr," ");
+    
+    // xorvalue
+    strcat(sendStr, str);
+
+    serverLog(LL_NOTICE, "in the processRecoverySignalData, the sendStr = %s", sendStr);
+
+    redisAppendCommand(cl,sendStr);
+
+    /*获取set命令结果*/
+    redisReply *reply;
+    redisGetReply(cl,(void **)&reply); // 7001.value
+    serverLog(LL_NOTICE, "in the processRecoverySignalData, the reply/7001.value is %s", reply->str);
+    redisFree(cl);
+
+    //val = reply->str
+    //做异或，得到需要恢复的value
+
+    dictEntry *tmp = dictFindParity(server.parityDict, entry->stat_set_commands);
+
+    int lenValNew = strlen(reply->str);//新value, 7001.value
+    int lenValOld = atoi((char*)tmp->val_len);//旧value, 7002.value
+
+    serverLog(LL_NOTICE,"the lenValOld = %d, the lenValNew = %d", lenValOld, lenValNew);
+
+    int lenvaltmp = (lenValOld>lenValNew)?lenValOld:lenValNew;
+
+    char *tmpValue = (char *)malloc(lenvaltmp*sizeof(char));
+    memset(tmpValue,0,(sizeof(char))*lenvaltmp);
+
+    for(int i = 0; i < lenValOld; i++){
+        tmpValue[i] ^= ((char*)tmp->v.val)[i];
+    }
+    for(int i = 0; i < lenValNew; i++){
+        tmpValue[i] ^= reply->str[i];
     }
 
-    dictEntry *result = dictFindParity(server.parityDict,tmp->stat_set_commands);
-    
-    //robj *val;
-    //val = createObject(OBJ_STRING,(char*)result->v.val);
+    serverLog(LL_NOTICE, "the tmpValue after XOR is %s", tmpValue);
+    for(int i=0;i<lenvaltmp;i++){
+        serverLog(LL_NOTICE, "the NO.%d tmpValue after XOR is %d", i, (int)tmpValue[i]);
+    }
 
-    //serverLog(LL_NOTICE,"in the processReplyGet, result->value: %s", (char*)result->v.val);
-    //serverLog(LL_NOTICE,"in the processReplyGet, val->value: %s", (char*)val->ptr);
- 
-    //addReplyBulk(c,val);
+    addReplyBulkCString(c,reply->str);
 
-    addReplyBulkCString(c, (char*)result->v.val);
+    freeReplyObject(tmpValue);
+    free(tmpValue);
 
     return C_OK;
 }
 
+int processRecoveryAll(client *c){
+
+    dictIterator *di;
+    dictEntry *de;
+    unsigned long numcnts = 0;
+
+    di = dictGetSafeIterator(server.parityDict);
+    while((de = dictNext(di)) != NULL) {
+        numcnts++;
+
+        const char* parityip = "127.0.0.1";
+        const uint16_t port = 7001;
+
+        redisContext *cl = redisConnect(parityip, port);
+
+        char *sendStr = (char *) malloc(sizeof(char)*100);
+        memset(sendStr,0,sizeof(char)*100);
+
+        // set 
+        strcat(sendStr,"get ");
+
+        // key
+        strcat(sendStr,"key ");
+
+        // flag 
+        char buf[32];
+        ll2string(buf,32,(long)PARIYT_DATANODE_TRANSFORM_DATA); //通知其他数据结点节点发送value
+        strcat(sendStr,buf);
+        strcat(sendStr," ");
+        
+        // cnt
+        strcat(sendStr,(char *)de->stat_set_commands);
+        strcat(sendStr," ");
+        
+        // len
+        memset(buf, 0, sizeof(char) * 32);
+        const char* str = "parityXOR";
+        ll2string(buf,32, strlen(str));
+        strcat(sendStr,buf);
+        strcat(sendStr," ");
+        
+        // xorvalue
+        strcat(sendStr, str);
+
+        serverLog(LL_NOTICE, "in the processRecoveryAll, the sendStr = %s", sendStr);
+
+        redisAppendCommand(cl,sendStr);
+
+        /*获取set命令结果*/
+        redisReply *reply;
+        redisGetReply(cl,(void **)&reply); // 7001.value
+        serverLog(LL_NOTICE, "in the processRecoveryAll, the reply(7001.key and 7001.value) is %s", reply->str);
+        redisFree(cl);
+
+        int agc = 2;
+        sds *agv;
+        sds aux = sdsnew(reply->str);
+        agv = sdssplitargs(aux,&agc);
+
+        serverLog(LL_NOTICE, "in the processRecoveryAll, the 7001.key is %s", agv[0]);
+        serverLog(LL_NOTICE, "in the processRecoveryAll, the 7001.value is %s", agv[1]);
+
+        freeReplyObject(reply);
+
+        //val = reply->str
+        //做异或，得到需要恢复的value
+        dbRecovery(server.db, de, agv[0], agv[1]);
+    }
+    dictReleaseIterator(di);
+
+    char *replyStr = (char *) malloc(sizeof(char)*100);
+    memset(replyStr,0,sizeof(char)*100);
+
+    strcat(replyStr,"Recovery ");
+    char buf[32];
+    ll2string(buf, 32, numcnts);
+    strcat(replyStr,buf);
+    strcat(replyStr," ");
+    strcat(replyStr,"keys");
+
+    serverLog(LL_NOTICE,"before reply 7001, the replyStr is %s", replyStr);
+
+    addReplyBulkCString(c,replyStr);
+
+    return C_OK;
+}
 #endif
 
 
