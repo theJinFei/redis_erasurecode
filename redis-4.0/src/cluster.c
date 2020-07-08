@@ -5495,12 +5495,6 @@ void clusterRedirectClient(client *c, clusterNode *n, int hashslot, int error_co
             addReplySds(c,sdscatprintf(sdsempty(),
             "-%s %d %s:%d\r\n", "MOVED", hashslot, parityip, parity_port));
         }
-        // if(processRecoveryGet(c)==C_OK){
-        //     serverLog(LL_NOTICE,"processRecoveryGet is C_OK");
-        // }else{
-        //     serverLog(LL_NOTICE,"processRecoveryGet is C_ERROR");
-        // }
-        //addReplySds(c,sdsnew("-CLUSTERDOWN The cluster is down\r\n"));
     } else if (error_code == CLUSTER_REDIR_DOWN_UNBOUND) {
         addReplySds(c,sdsnew("-CLUSTERDOWN Hash slot not served\r\n"));
     } else if (error_code == CLUSTER_REDIR_MOVED ||

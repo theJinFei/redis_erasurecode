@@ -60,6 +60,11 @@
 #include "parity.h"
 #include "./../deps/hiredis/hiredis.h"
 #include "./../deps/hiredis/read.h"
+#include "./../deps/Jerasure-1.2/jerasure.h"
+#include "./../deps/Jerasure-1.2/reed_sol.h"
+
+#define talloc(type, num) (type *) malloc(sizeof(type)*(num))
+
 #endif
 
 #ifdef USE_PMDK
@@ -947,6 +952,7 @@ struct redisServer {
     dict* parityDict;           /* parity data */
     dict* KeyCntDict;           /* map key and cnt */
     dict* CntKeyDict;           /* map key and cnt */
+    int *matrix;
 # endif
     dict *orig_commands;        /* Command table before command renaming. */
     aeEventLoop *el;
@@ -1595,7 +1601,7 @@ void replicationFeedSlaves(list *slaves, int dictid, robj **argv, int argc);
 # ifdef _ERASURE_CODE_
 void feedParityARGV(client *c, const int argc, robj** argv);
 void feedParityXOR(client *c, const char* parityXOR);
-void feedParityXORLen(client *c, const char* parityXOR, int len);
+void feedParityXORLen(client *c, const char* key, const char* parityXOR, int len);
 # endif
 
 void replicationFeedSlavesFromMasterStream(list *slaves, char *buf, size_t buflen);
@@ -1723,7 +1729,8 @@ int processCommand(client *c);
 
 #ifdef _ERASURE_CODE_
 void insertKeyCntDict(client* c);
-int processEncodeCommand(client *c);
+int insertCntKeyDict(client* c);
+int processEncodeCommand(client *c, int keyFlag);
 int processUpdateParityCommand(client *c);
 void setParityEntry(redisDb *db, dictEntry *entry);
 
@@ -1731,6 +1738,9 @@ int processReplyGet(client *c);
 int processRecoverySignalData(client *c);
 
 int processRecoveryAll(client *c);
+
+int erasure_encode_firstkey(dict *d, void *cnt, void *val, int keyFlag);
+int erasure_encode_anotherkey(dict *d, void *cnt, void *val, void *val_len, int keyFlag);
 #endif
 
 void setupSignalHandlers(void);
@@ -1862,7 +1872,7 @@ robj *dbUnshareStringValue(redisDb *db, robj *key, robj *o);
 // void dbAddParity(redisDb *db, robj *key, robj *val, robj *cnt, robj *len);
 // void dbOverwriteParity(redisDb *db, robj *key, robj *val, robj *cnt, robj *len);
 // void dbUpdateParity(redisDb *db, robj *key, robj *val, robj *cnt, robj *len);
-void dbRecovery(redisDb *db, dictEntry *de, sds key, sds value);
+void dbRecovery(redisDb *db, dictEntry *de, char *key, char *value);
 # endif
 
 #define EMPTYDB_NO_FLAGS 0      /* No flags. */

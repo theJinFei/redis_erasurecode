@@ -312,17 +312,42 @@ int dictAddKeyCnt(dict* d, void* key, void* cnt)
     return DICT_OK;
 }
 
-int dictAddCntKey(dict* d, void* key, void* cnt)
-{
-    dictEntry *entry = dictAddRawParity(d,cnt,NULL);  ;  
+int dictAddCntKey(dict* d, void* cnt, void* key1, void *key2, void *key3){
+    dictEntry *entry = dictAddRawParity(d,cnt,NULL); 
 
-    if (!entry) return DICT_ERR;
-    dictSetKey(d, entry, key);
+    if (!entry) {//已经有cnt和一个key了
+        dictEntry *tmp_entry = dictFindParity(d, cnt);
+        if(key1 != NULL){
+            dictSetKey(d, tmp_entry, key1);
+        }
+        else if(key2 != NULL){
+            dictSetVal(d, tmp_entry, key2);
+        }
+        else if(key3 != NULL){
+            dictSetLen(d, tmp_entry, key3);
+        }
+        else{
+            serverLog(LL_NOTICE, "in the dictAddCntKey, the key1, key2 and key3 NULL");
+            return C_ERR;
+        }
 
-    serverLog(LL_NOTICE,"in the dictAddCntKey, the entry is:");
-    serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)entry->stat_set_commands);
-    serverLog(LL_NOTICE,"Entry->key: %s", (char *)entry->key);
+        serverLog(LL_NOTICE,"in the dictAddCntKey, the tmp_entry is:");
+        serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmp_entry->stat_set_commands);
+        serverLog(LL_NOTICE,"Entry->key1: %s", (char *)tmp_entry->key);
+        serverLog(LL_NOTICE,"Entry->key2: %s", (char *)tmp_entry->v.val);
+        serverLog(LL_NOTICE,"Entry->key3: %s", (char *)tmp_entry->val_len);
+    }
+    else{//第一次插入key
+        dictSetKey(d, entry, key1);
+        dictSetVal(d, entry, key2);
+        dictSetLen(d, entry, key3);
 
+        serverLog(LL_NOTICE,"in the dictAddCntKey, the entry is:");
+        serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)entry->stat_set_commands);
+        serverLog(LL_NOTICE,"Entry->key1: %s", (char *)entry->key);
+        serverLog(LL_NOTICE,"Entry->key2: %s", (char *)entry->v.val);
+        serverLog(LL_NOTICE,"Entry->key3: %s", (char *)entry->val_len);
+    }
     return DICT_OK;
 }
 
@@ -430,9 +455,7 @@ dictEntry *dictAddRawParity(dict *d, void *cnt, dictEntry **existing){
         serverLog(LL_NOTICE,"in the dictAddRawParity, the element already exists");
         return NULL;
     }
-        
 
-    
     //serverLog(LL_NOTICE,"in the dictAddRawParity, the h = %d",dictHashKey(d,cnt));
 
     /* Allocate the memory and store the new entry.
@@ -579,6 +602,8 @@ int dictReplaceParity(dict *d, void *cnt, void *key, void *val, void *len, int f
         int lenKeyOld=strlen((char*)entry->key);
         int lenKeyNew=strlen((char*)key);
 
+        serverLog(LL_NOTICE,"the lenKeyOld = %d, the lenKeyNew = %d", lenKeyOld, lenKeyNew);
+
         int lenkeytmp = (lenKeyOld>lenKeyNew)?lenKeyOld:lenKeyNew;
 
         char *tmpKey = (char *)malloc(lenkeytmp*sizeof(char));
@@ -600,8 +625,18 @@ int dictReplaceParity(dict *d, void *cnt, void *key, void *val, void *len, int f
 
 
     // 校验Value
-    int lenValOld=atoi((char*)entry->val_len);
-    int lenValNew=atoi((char*)len);
+    int lenValOld=*(int*)entry->val_len;
+    int lenValNew;
+    if(flag == 1){
+        lenValNew =strlen((char *)val);
+    }
+    else if(flag == 2){
+        lenValNew = atoi((char*)len);
+    }
+    else{
+        serverLog(LL_NOTICE,"in the dictReplaceParity, the flag is error");
+    }
+  
 
     serverLog(LL_NOTICE,"the lenValOld = %d, the lenValNew = %d", lenValOld, lenValNew);
 
@@ -624,9 +659,11 @@ int dictReplaceParity(dict *d, void *cnt, void *key, void *val, void *len, int f
     serverLog(LL_NOTICE,"after Set Parity Val, the NewValue is %s",(char *)entry->v.val);
 
     // 设置新的val_len
-    void* tmpLen = (lenValOld>lenValNew)?entry->val_len:len;
+    int tmpLen = (lenValOld>lenValNew)?lenValOld:lenValNew;
+    int * tmpValLen = (int *)malloc(tmpLen*sizeof(int));
+    * tmpValLen = tmpLen;
     //serverLog(LL_NOTICE,"before dictSetLen, the val_len = %d", lenvaltmp);
-    dictSetLen(d, entry, tmpLen);
+    dictSetLen(d, entry, tmpValLen);
 
     // 释放旧值 
     // dictFreeVal(d, &auxentry);

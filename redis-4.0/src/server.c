@@ -1916,6 +1916,15 @@ void initServer(void) {
     server.parityDict = dictCreate(&dbDictType, NULL);
     server.KeyCntDict = dictCreate(&dbDictType, NULL);
     server.CntKeyDict = dictCreate(&dbDictType, NULL);
+
+    int k=3, m=2, w=8;
+    server.matrix = reed_sol_vandermonde_coding_matrix(k, m, w);
+    serverLog(LL_NOTICE,"Last m rows of the Distribution Matrix:");
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < k; j++) {
+            serverLog(LL_NOTICE, "%d", server.matrix[i*k+j]); 
+        }
+    }
 # endif
     server.current_client = NULL;
     server.clients = listCreate();
@@ -2644,20 +2653,44 @@ void insertKeyCntDict(client* c)
         dictEntry *tmp = dictFind(server.KeyCntDict,c->argv[1]->ptr);
         if(tmp!=NULL){
             serverLog(LL_NOTICE,"the insertKeyCntDict successfully ...");
-            serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmp->stat_set_commands);
             serverLog(LL_NOTICE,"Entry->key: %s", (char*)tmp->key);
+            serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmp->stat_set_commands);  
         }
     
     } else {
         //已经有过的key
-        serverLog(LL_NOTICE,"KeyCntDict isn't NULL and ");
+        serverLog(LL_NOTICE,"KeyCntDict isn't NULL and return");
     }
 
 }
 
+int insertCntKeyDict(client* c){
+    // robj* key = c -> argv[1];
+    // robj* cnt = c -> argv[3];
+    // robj* len = c -> argv[4];
+    sds copy = sdsdup(c->argv[3]->ptr);
+    int tmpPort = atoi((char*)c -> argv[4]->ptr);
+
+    if(tmpPort == 7000){
+        dictAddCntKey(server.CntKeyDict, copy, c->argv[1]->ptr, NULL, NULL);
+        return 0;
+    }
+    else if(tmpPort == 7001){
+        dictAddCntKey(server.CntKeyDict, copy, NULL, c->argv[1]->ptr, NULL);
+        return 1;
+    }
+    else if(tmpPort == 7004){
+        dictAddCntKey(server.CntKeyDict, copy, NULL, NULL, c->argv[1]->ptr);
+        return 2;
+    }
+    else{
+        serverLog(LL_NOTICE, "the client port is error");
+        return 3;
+    }
+}
 
 // 将收到的消息写入校验节点 应该把key value插入到hash表中
-int processEncodeCommand(client *c){
+int processEncodeCommand(client *c, int keyFlag){
     serverLog(LL_NOTICE,"in the processEncodeCommand");
     int j;
     for(j = 0; j < c -> argc; j++){
@@ -2673,29 +2706,28 @@ int processEncodeCommand(client *c){
     //val_len = c->argv[4];
     //val = c->argv[5];
 
+    int * tmpCnt = (int *)malloc(strlen((char *)c->argv[5]->ptr)*sizeof(int));
+    * tmpCnt = strlen((char *)c->argv[5]->ptr);
+    serverLog(LL_NOTICE, "in the processEncodeCommand, the val_len = %d", *tmpCnt);
+
     if (dictFindParity(server.parityDict,c->argv[3]->ptr) == NULL) {
         //全新的cnt，向hash表中插入key,val,cnt
         serverLog(LL_NOTICE,"dictFindParity is NULL and dbAddParity");
-        //dbAddParity(c->db,c->argv[1],c->argv[5],c->argv[3],c->argv[4]);
 
         sds copy = sdsdup(c->argv[3]->ptr);
-        int retval = dictAddParity(server.parityDict, copy, c->argv[1]->ptr, c->argv[5]->ptr, c->argv[4]->ptr);
-        if (server.cluster_enabled) slotToKeyAdd(c->argv[3]);
-
+        erasure_encode_firstkey(server.parityDict, copy, c->argv[5]->ptr, keyFlag);
     } else {
         //已经有过的cnt
         //另一个data node的同cnt命令，做校验后插入
         serverLog(LL_NOTICE,"dictFindParity isn't NULL and dbOverwriteParity");
-        //dbOverwriteParity(c->db, c->argv[1], c->argv[5], c->argv[3], c->argv[4]);
 
         dictEntry *de = dictFindParity(server.parityDict,c->argv[3]->ptr);
         serverAssertWithInfo(NULL,c->argv[1],de != NULL);
-
-        //serverLog(LL_NOTICE,"in the dbOverwriteParity before, the key is %s",(char *)key->ptr);
-        //serverLog(LL_NOTICE,"in the dbOverwriteParity before, the val is %s",(char *)val->ptr);
     
-        int flag = 1;
-        dictReplaceParity(server.parityDict, c->argv[3]->ptr, c->argv[1]->ptr, c->argv[5]->ptr, c->argv[4]->ptr, flag);
+        // int flag = 1;
+        // dictReplaceParity(server.parityDict, c->argv[3]->ptr, c->argv[1]->ptr, c->argv[5]->ptr, tmpCnt, flag);
+        sds copy = sdsdup(c->argv[3]->ptr);
+        erasure_encode_anotherkey(server.parityDict, copy, c->argv[5]->ptr, NULL, keyFlag);
     }
 
     return C_OK;
@@ -2722,17 +2754,48 @@ int processUpdateParityCommand(client *c){
         return C_ERR;
     } else {
         //已经有过的cnt
-        //另一个data node的同cnt命令，做校验后插入
+        //同一个data node的同cnt命令更新，做校验后插入
         serverLog(LL_NOTICE,"dictFindParity isn't NULL and dbUpdateParity");
-        //dbUpdateParity(c->db, c->argv[1], c->argv[5], c->argv[3], c->argv[4]);
 
         dictEntry *de = dictFindParity(server.parityDict,c->argv[3]->ptr);
         serverAssertWithInfo(NULL,c->argv[1],de != NULL);
-    
-        int flag = 2;
-        dictReplaceParity(server.parityDict, c->argv[3]->ptr, c->argv[1]->ptr, c->argv[5]->ptr, c->argv[4]->ptr, flag);
-    }
 
+        int flag;
+        dictEntry *keyEntry = dictFindParity(server.CntKeyDict, c->argv[3]->ptr);
+
+        if(keyEntry == NULL){
+            serverLog(LL_NOTICE, "before updateParity, the keyEntry is NULL");
+        }
+        else{
+            serverLog(LL_NOTICE, "before updateParity, the keyEntry isn't NULL");
+            serverLog(LL_NOTICE, "keyEntry->key is %s", (char *)keyEntry->key);
+            serverLog(LL_NOTICE, "keyEntry->v.val is %s", (char *)keyEntry->v.val);
+            serverLog(LL_NOTICE, "keyEntry->val_len is %s", (char *)keyEntry->val_len);
+            serverLog(LL_NOTICE, "c->argv[1]->ptr is %s", (char *)c->argv[1]->ptr);
+        }
+
+        if((keyEntry->key != NULL) && (strcmp((char *)keyEntry->key, (char *)c->argv[1]->ptr) == 0)){
+            flag = 0;
+            serverLog(LL_NOTICE, "before updateParity, the flag is %d", flag);
+        }
+        else if((keyEntry->v.val != NULL) && (strcmp((char *)keyEntry->v.val, (char *)c->argv[1]->ptr)) == 0){
+            flag = 1;
+            serverLog(LL_NOTICE, "before updateParity, the flag is %d", flag);
+        }
+        else if((keyEntry->val_len != NULL) && (strcmp((char *)keyEntry->val_len, (char *)c->argv[1]->ptr)) == 0){
+            flag = 2;
+            serverLog(LL_NOTICE, "before updateParity, the flag is %d", flag);
+        }
+        else{
+            serverLog(LL_NOTICE, "didn't find the key in the server.CntKeyDict");
+            return C_ERR;
+        }
+
+        serverLog(LL_NOTICE, "before updateParity, the flag is %d", flag);
+
+        sds copy = sdsdup(c->argv[3]->ptr);
+        erasure_encode_anotherkey(server.parityDict, copy, c->argv[5]->ptr, c->argv[4]->ptr, flag);
+    }
     return C_OK;
 }
 
@@ -2768,23 +2831,33 @@ int processRecoverySignalData(client *c){
 
     char *sendStr = (char *) malloc(sizeof(char)*100);
     memset(sendStr,0,sizeof(char)*100);
+    char buf[32];
 
     // set 
     strcat(sendStr,"SET ");
 
     // key
-    strcat(sendStr,"key ");
+    dictEntry *tmpCnt = dictFind(server.KeyCntDict, c->argv[1]->ptr);
+    // serverLog(LL_NOTICE, "in the processRecoverySignalData, the tmpCnt = %s", (char *)tmpCnt->stat_set_commands);
+    dictEntry *tmpKey = dictFindParity(server.CntKeyDict, tmpCnt->stat_set_commands);
+    // serverLog(LL_NOTICE, "in the processRecoverySignalData, the tmpKey = %s", (char *)tmpKey->v.val);
+    if(tmpKey->v.val == NULL){
+        dictEntry *reply_entry = dictFindParity(server.parityDict, tmpCnt->stat_set_commands);
+        addReplyBulkCString(c, (char *)reply_entry->v.val);
+        serverLog(LL_NOTICE, "in the processRecoverySignalData, reply value directly, the value = %s", (char *)reply_entry->v.val);
+        return C_OK;
+    }
+    strcat(sendStr,(char *)tmpKey->v.val);
+    strcat(sendStr," ");
 
     // flag 
-    char buf[32];
-    ll2string(buf,32,(long)PARIYT_DATANODE_TRANSFORM_DATA); //通知其他数据结点节点发送value
+    ll2string(buf,32,(long)PARIYT_DATANODE_TRANSFORM_VALUE); //通知其他数据结点节点发送value
     strcat(sendStr,buf);
     strcat(sendStr," ");
     
     // cnt
     memset(buf, 0, sizeof(char) * 32);
-    dictEntry *entry = dictFind(server.KeyCntDict, c -> argv[1]->ptr);
-    strcat(sendStr,(char *)entry->stat_set_commands);
+    strcat(sendStr,(char *)tmpCnt->stat_set_commands);
     strcat(sendStr," ");
     
     // len
@@ -2810,10 +2883,10 @@ int processRecoverySignalData(client *c){
     //val = reply->str
     //做异或，得到需要恢复的value
 
-    dictEntry *tmp = dictFindParity(server.parityDict, entry->stat_set_commands);
+    dictEntry *tmp = dictFindParity(server.parityDict, tmpCnt->stat_set_commands);
 
     int lenValNew = strlen(reply->str);//新value, 7001.value
-    int lenValOld = atoi((char*)tmp->val_len);//旧value, 7002.value
+    int lenValOld = *(int*)tmp->val_len;//旧value, 7002.value
 
     serverLog(LL_NOTICE,"the lenValOld = %d, the lenValNew = %d", lenValOld, lenValNew);
 
@@ -2834,7 +2907,7 @@ int processRecoverySignalData(client *c){
         serverLog(LL_NOTICE, "the NO.%d tmpValue after XOR is %d", i, (int)tmpValue[i]);
     }
 
-    addReplyBulkCString(c,reply->str);
+    addReplyBulkCString(c,tmpValue);
 
     freeReplyObject(tmpValue);
     free(tmpValue);
@@ -2847,13 +2920,13 @@ int processRecoveryAll(client *c){
     dictIterator *di;
     dictEntry *de;
     unsigned long numcnts = 0;
+    
+    const char* parityip = "127.0.0.1";
+    const uint16_t port = 7001;
 
     di = dictGetSafeIterator(server.parityDict);
     while((de = dictNext(di)) != NULL) {
         numcnts++;
-
-        const char* parityip = "127.0.0.1";
-        const uint16_t port = 7001;
 
         redisContext *cl = redisConnect(parityip, port);
 
@@ -2864,11 +2937,22 @@ int processRecoveryAll(client *c){
         strcat(sendStr,"get ");
 
         // key
-        strcat(sendStr,"key ");
+        dictEntry *tmpKey = dictFindParity(server.CntKeyDict, de->stat_set_commands);
+
+        if(tmpKey->v.val == NULL){
+            dictEntry *recovery_entry = dictFindParity(server.parityDict, de->stat_set_commands);
+            dictAddRecovery(server.db->dict, recovery_entry->key, recovery_entry->v.val, recovery_entry->stat_set_commands);
+            serverLog(LL_NOTICE, "in the processRecoveryAll, recovery value directly, the value = %s", (char *)recovery_entry->v.val);
+            continue;
+        }
+
+        strcat(sendStr,(char *)tmpKey->v.val);
+        strcat(sendStr," ");
+
 
         // flag 
         char buf[32];
-        ll2string(buf,32,(long)PARIYT_DATANODE_TRANSFORM_DATA); //通知其他数据结点节点发送value
+        ll2string(buf,32,(long)PARIYT_DATANODE_TRANSFORM_VALUE); //通知其他数据结点节点发送value
         strcat(sendStr,buf);
         strcat(sendStr," ");
         
@@ -2893,22 +2977,22 @@ int processRecoveryAll(client *c){
         /*获取set命令结果*/
         redisReply *reply;
         redisGetReply(cl,(void **)&reply); // 7001.value
-        serverLog(LL_NOTICE, "in the processRecoveryAll, the reply(7001.key and 7001.value) is %s", reply->str);
+        serverLog(LL_NOTICE, "in the processRecoveryAll, the reply(7001.value) is %s", reply->str);
         redisFree(cl);
 
-        int agc = 2;
-        sds *agv;
-        sds aux = sdsnew(reply->str);
-        agv = sdssplitargs(aux,&agc);
+        // int agc = 2;
+        // sds *agv;
+        // sds aux = sdsnew(reply->str);
+        // agv = sdssplitargs(aux,&agc);
 
-        serverLog(LL_NOTICE, "in the processRecoveryAll, the 7001.key is %s", agv[0]);
-        serverLog(LL_NOTICE, "in the processRecoveryAll, the 7001.value is %s", agv[1]);
-
-        freeReplyObject(reply);
+        // serverLog(LL_NOTICE, "in the processRecoveryAll, the 7001.key is %s", agv[0]);
+        // serverLog(LL_NOTICE, "in the processRecoveryAll, the 7001.value is %s", agv[1]);
 
         //val = reply->str
         //做异或，得到需要恢复的value
-        dbRecovery(server.db, de, agv[0], agv[1]);
+        dbRecovery(server.db, de, (char *)tmpKey->key, reply->str);
+        
+        freeReplyObject(reply);
     }
     dictReleaseIterator(di);
 
@@ -2925,6 +3009,282 @@ int processRecoveryAll(client *c){
     serverLog(LL_NOTICE,"before reply 7001, the replyStr is %s", replyStr);
 
     addReplyBulkCString(c,replyStr);
+
+    return C_OK;
+}
+
+
+int erasure_encode_firstkey(dict *d, void *cnt, void *val, int keyFlag){
+    int k=3, m=2, w=8;
+    char **data, **coding;
+    int i,j,n;
+    char *tmpval_1;
+    char **tmpval;
+
+    data = talloc(char *, k);
+    for (i = 0; i < k; i++) {
+        data[i] = talloc(char, sizeof(int));//4字节
+        memset(data[i],0,sizeof(int)); 
+    }
+
+    coding = talloc(char *, m);
+    for (i = 0; i < m; i++) {
+        coding[i] = talloc(char, sizeof(int));
+        memset(coding[i],0,sizeof(int)); 
+    }
+
+    int len = strlen((char *)val);
+    serverLog(LL_NOTICE,"the val is %s", (char *)val);
+    serverLog(LL_NOTICE,"the len of val is %d", len);
+    
+    if(len <= 4){
+        tmpval_1 = talloc(char, sizeof(int));
+        memset(tmpval_1,0,sizeof(int)); 
+        for(n=0;  n<len; n++){
+            tmpval_1[n] = ((char*)val)[n];
+        }
+        //tmpval_1[4]='\0';
+        serverLog(LL_NOTICE,"before the encode, the tmpval_1 is %s and the len is %d", tmpval_1, strlen(tmpval_1));
+
+        switch(keyFlag){
+        case 0:
+            memcpy(data[0], tmpval_1, sizeof(int));
+            serverLog(LL_NOTICE,"before the encode, the data[0] is %s and the len is %d", data[0], strlen(data[0]));
+            break;
+        case 1:
+            memcpy(data[1], tmpval_1, sizeof(int));
+            serverLog(LL_NOTICE,"before the encode, the data[1] is %s and the len is %d", data[1], strlen(data[1]));
+            break;
+        case 2:
+            memcpy(data[2], tmpval_1, sizeof(int));
+            serverLog(LL_NOTICE,"before the encode, the data[2] is %s and the len is %d", data[2], strlen(data[2]));
+            break;
+        }
+
+        jerasure_matrix_encode(k, m, w, server.matrix, data, coding, sizeof(int));
+        serverLog(LL_NOTICE,"after the encode, the coding[0] is %s and the len is %d", coding[0], strlen(coding[0]));
+
+        if(server.port == 7002){
+            memcpy(tmpval_1, coding[0], sizeof(int));
+            serverLog(LL_NOTICE,"after the encode, the tmpval_1 is %s and the len is %d", tmpval_1, strlen(tmpval_1));
+        }
+        else if(server.port == 7003){
+            memcpy(tmpval_1, coding[1], sizeof(int));
+            serverLog(LL_NOTICE,"after the encode, the tmpval_1 is %s and the len is %d", tmpval_1, strlen(tmpval_1));
+        }
+        else{
+            return C_ERR;
+        }
+    }
+
+    else{
+        int time = len/4 + 1;
+
+        tmpval = talloc(char *, time);
+        for (i = 0; i < time; i++) {
+            tmpval[i] = talloc(char, sizeof(int));//4字节
+            memset(tmpval[i],0,sizeof(int)); 
+        }
+
+        tmpval_1 = talloc(char, sizeof(int)*time);
+        memset(tmpval_1,0,sizeof(int)*time); 
+
+        for(n=0; n<time ;n++){
+            memcpy(tmpval[n], ((char*)val)+4*n, sizeof(int));
+            serverLog(LL_NOTICE,"before encode, the tmpval[n] is %s", tmpval[n]);
+            switch(keyFlag){
+                case 0:
+                    memcpy(data[0], tmpval[n], sizeof(int));
+                    serverLog(LL_NOTICE,"before the encode, the data[0] is %s and the len is %d", data[0], strlen(data[0]));
+                    break;
+                case 1:
+                    memcpy(data[1], tmpval[n], sizeof(int));
+                    serverLog(LL_NOTICE,"before the encode, the data[1] is %s and the len is %d", data[1], strlen(data[1]));
+                    break;
+                case 2:
+                    memcpy(data[2], tmpval[n], sizeof(int));
+                    serverLog(LL_NOTICE,"before the encode, the data[2] is %s and the len is %d", data[2], strlen(data[2]));
+                    break;
+            }
+            jerasure_matrix_encode(k, m, w, server.matrix, data, coding, sizeof(int));
+            serverLog(LL_NOTICE,"after the encode, the coding[0] is %s and the len is %d", coding[0], strlen(coding[0]));
+
+            if(server.port == 7002){
+                memcpy(tmpval[n], coding[0], sizeof(int));
+                serverLog(LL_NOTICE,"after the encode, the tmpval[n] is %s and the len is %d", tmpval[n], strlen(tmpval[n]));
+            }
+            else if(server.port == 7003){
+                memcpy(tmpval[n], coding[1], sizeof(int));
+                serverLog(LL_NOTICE,"after the encode, the tmpval[n] is %s and the len is %d", tmpval[n], strlen(tmpval[n]));
+            }
+            else{
+                return C_ERR;
+            }
+            strcat(tmpval_1, tmpval[n]);
+            serverLog(LL_NOTICE, "after encode, the tmpval_1 is %s", tmpval_1);
+        }
+    }
+
+    int * tmpCnt = (int *)malloc(strlen(tmpval_1)*sizeof(int));
+    * tmpCnt = strlen(tmpval_1);
+    dictAddParity(d, cnt, NULL, tmpval_1, tmpCnt);
+    return C_OK;
+}
+
+int erasure_encode_anotherkey(dict *d, void *cnt, void *val, void *val_len, int keyFlag){
+    dictEntry *codeEntry = dictFindParity(server.parityDict, cnt);
+
+    serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)codeEntry->stat_set_commands);
+    serverLog(LL_NOTICE,"Entry->key: %s", (char*)codeEntry->key);
+    serverLog(LL_NOTICE,"Entry->val: %s", (char*)codeEntry->v.val);
+    serverLog(LL_NOTICE,"Entry->val_len: %d", *(int*)codeEntry->val_len);
+
+    int len;
+    if(val_len != NULL){
+        len = atoi((char*)val_len);
+    }
+    else{
+        len = strlen((char *)val);
+    }
+
+    int k=3, m=2, w=8;
+    char **data, **coding;
+    int i,j,n;
+    char *tmpval_1;
+    char **tmpval;
+
+    data = talloc(char *, k);
+    for (i = 0; i < k; i++) {
+        data[i] = talloc(char, sizeof(int));//4字节
+        memset(data[i],0,sizeof(int)); 
+    }
+
+    coding = talloc(char *, m);
+    for (i = 0; i < m; i++) {
+        coding[i] = talloc(char, sizeof(int));
+        memset(coding[i],0,sizeof(int)); 
+    }
+
+    //int len = strlen((char *)val);
+    serverLog(LL_NOTICE,"the val is %s", (char *)val);
+    serverLog(LL_NOTICE,"the len of val is %d", len);
+    
+    if(len <= 4){
+        tmpval_1 = talloc(char, sizeof(int));
+        memset(tmpval_1,0,sizeof(int)); 
+        for(n=0;  n<len; n++){
+            tmpval_1[n] = ((char*)val)[n];
+        }
+        serverLog(LL_NOTICE,"before the encode, the tmpval_1 is %s and the len is %d", tmpval_1, strlen(tmpval_1));
+
+        switch(keyFlag){
+        case 0:
+            memcpy(data[0], tmpval_1, sizeof(int));
+            serverLog(LL_NOTICE,"before the encode, the data[0] is %s and the len is %d", data[0], strlen(data[0]));
+            break;
+        case 1:
+            memcpy(data[1], tmpval_1, sizeof(int));
+            serverLog(LL_NOTICE,"before the encode, the data[1] is %s and the len is %d", data[1], strlen(data[1]));
+            break;
+        case 2:
+            memcpy(data[2], tmpval_1, sizeof(int));
+            serverLog(LL_NOTICE,"before the encode, the data[2] is %s and the len is %d", data[2], strlen(data[2]));
+            break;
+        }
+
+        jerasure_matrix_encode(k, m, w, server.matrix, data, coding, sizeof(int));
+        serverLog(LL_NOTICE,"after the encode, the coding[0] is %s and the len is %d", coding[0], strlen(coding[0]));
+
+        if(server.port == 7002){
+            memcpy(tmpval_1, coding[0], sizeof(int));
+            serverLog(LL_NOTICE,"after the encode, the tmpval_1 is %s and the len is %d", tmpval_1, strlen(tmpval_1));
+        }
+        else if(server.port == 7003){
+            memcpy(tmpval_1, coding[1], sizeof(int));
+            serverLog(LL_NOTICE,"after the encode, the tmpval_1 is %s and the len is %d", tmpval_1, strlen(tmpval_1));
+        }
+        else{
+            return C_ERR;
+        }
+    }
+
+    else{
+        int time = len/4 + 1;
+
+        tmpval = talloc(char *, time);
+        for (i = 0; i < time; i++) {
+            tmpval[i] = talloc(char, sizeof(int));//4字节
+            memset(tmpval[i],0,sizeof(int)); 
+        }
+
+        tmpval_1 = talloc(char, sizeof(int)*time);
+        memset(tmpval_1,0,sizeof(int)*time); 
+
+        for(n=0; n<time; n++){
+            memcpy(tmpval[n], ((char*)val)+4*n, sizeof(int));
+            serverLog(LL_NOTICE,"before encode, the tmpval[n] is %s", tmpval[n]);
+            switch(keyFlag){
+                case 0:
+                    memcpy(data[0], tmpval[n], sizeof(int));
+                    serverLog(LL_NOTICE,"before the encode, the data[0] is %s and the len is %d", data[0], strlen(data[0]));
+                    break;
+                case 1:
+                    memcpy(data[1], tmpval[n], sizeof(int));
+                    serverLog(LL_NOTICE,"before the encode, the data[1] is %s and the len is %d", data[1], strlen(data[1]));
+                    break;
+                case 2:
+                    memcpy(data[2], tmpval[n], sizeof(int));
+                    serverLog(LL_NOTICE,"before the encode, the data[2] is %s and the len is %d", data[2], strlen(data[2]));
+                    break;
+            }
+            jerasure_matrix_encode(k, m, w, server.matrix, data, coding, sizeof(int));
+            serverLog(LL_NOTICE,"after the encode, the coding[0] is %s and the len is %d", coding[0], strlen(coding[0]));
+
+            if(server.port == 7002){
+                memcpy(tmpval[n], coding[0], sizeof(int));
+                serverLog(LL_NOTICE,"after the encode, the tmpval[n] is %s and the len is %d", tmpval[n], strlen(tmpval[n]));
+            }
+            else if(server.port == 7003){
+                memcpy(tmpval[n], coding[1], sizeof(int));
+                serverLog(LL_NOTICE,"after the encode, the tmpval[n] is %s and the len is %d", tmpval[n], strlen(tmpval[n]));
+            }
+            else{
+                return C_ERR;
+            }
+            strcat(tmpval_1, tmpval[n]);
+            serverLog(LL_NOTICE, "after encode, the tmpval_1 is %s", tmpval_1);
+        }
+    }
+
+    // 校验Value
+    int lenValOld = *(int*)codeEntry->val_len;
+    int lenValNew = len;
+    serverLog(LL_NOTICE,"the lenValOld = %d, the lenValNew = %d", lenValOld, lenValNew);
+
+    int lenvaltmp = (lenValOld>lenValNew)?lenValOld:lenValNew;
+
+    char *tmpValue = (char *)malloc(lenvaltmp*sizeof(char));
+    memset(tmpValue,0,(sizeof(char))*lenvaltmp);
+
+    for(int i = 0; i < lenValOld; i++){
+        tmpValue[i] ^= ((char*)codeEntry->v.val)[i];
+    }
+    for(int i = 0; i < lenValNew; i++){
+        tmpValue[i] ^= tmpval_1[i];
+    }
+
+    serverLog(LL_NOTICE,"before Set Parity Val, the tmpValue is %s",tmpValue);
+    // 设置新的val
+    dictSetVal(d, codeEntry, tmpValue);
+
+    serverLog(LL_NOTICE,"after Set Parity Val, the NewValue is %s",(char *)codeEntry->v.val);
+
+    // 设置新的val_len
+    int tmpLen = (lenValOld>lenValNew)?lenValOld:lenValNew;
+    int * tmpValLen = (int *)malloc(tmpLen*sizeof(int));
+    * tmpValLen = tmpLen;
+    //serverLog(LL_NOTICE,"before dictSetLen, the val_len = %d", lenvaltmp);
+    dictSetLen(d, codeEntry, tmpValLen);
 
     return C_OK;
 }

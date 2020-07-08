@@ -1383,6 +1383,17 @@ void processInputBuffer(client *c) {
         if(strcmp((char *)(c -> argv[0] -> ptr), "recovery") == 0){
             if(processRecoveryAll(c) == C_OK){
                 serverLog(LL_NOTICE,"processRecoveryAll is OK");
+
+                dictIterator *di;
+                dictEntry *de;
+
+                di = dictGetSafeIterator(server.db->dict);
+                while((de = dictNext(di)) != NULL) {
+                    serverLog(LL_NOTICE,"in the dictIterator of server.db->dict, Entry->cnt: %s", (char *)de->stat_set_commands);
+                    serverLog(LL_NOTICE,"in the dictIterator of server.db->dict, Entry->key: %s", (char *)de->key);
+                    serverLog(LL_NOTICE,"in the dictIterator of server.db->dict, Entry->val: %s", (char *)de->v.val);
+                }
+
                 parity_flag = 1;
             }
             else{
@@ -1405,7 +1416,7 @@ void processInputBuffer(client *c) {
             // set key flag cnt len pairtyXOR
             for(int i = 0; i < c -> argc; i++){
                 robj* o = getDecodedObject(c -> argv[i]);
-                serverLog(LL_NOTICE,"o -> ptr is %s", (char *)(o -> ptr));
+                serverLog(LL_NOTICE,"before the switch-case, o -> ptr is %s", (char *)(o -> ptr));
             }
             
             // key
@@ -1440,8 +1451,10 @@ void processInputBuffer(client *c) {
                 serverLog(LL_NOTICE,"in the PARITY_READ_BUFFER_AND_ENCODE, and the server.testStr is %s", server.testStr);
                 
                 insertKeyCntDict(c);//更新key和cnt的hash表
+                int keyFlag = insertCntKeyDict(c);//更新cnt和key的hash表
+                serverLog(LL_NOTICE, "the keyFlag is %d", keyFlag);
 
-                if (processEncodeCommand(c) != C_OK){
+                if (processEncodeCommand(c, keyFlag) != C_OK){
                     serverLog(LL_NOTICE,"Process Encode error in processEncodeCommand");
                 }
                 else{
@@ -1451,7 +1464,7 @@ void processInputBuffer(client *c) {
                         serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmp->stat_set_commands);
                         serverLog(LL_NOTICE,"Entry->key: %s", (char*)tmp->key);
                         serverLog(LL_NOTICE,"Entry->val: %s", (char*)tmp->v.val);
-                        serverLog(LL_NOTICE,"Entry->val_len: %s", (char*)tmp->val_len);
+                        serverLog(LL_NOTICE,"Entry->val_len: %d", *(int*)tmp->val_len);
 
                         addReplyBulk(c,c->argv[5]); 
                         parity_flag = 1;
@@ -1474,7 +1487,7 @@ void processInputBuffer(client *c) {
                         serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmp->stat_set_commands);
                         serverLog(LL_NOTICE,"Entry->key: %s", (char*)tmp->key);
                         serverLog(LL_NOTICE,"Entry->val: %s", (char*)tmp->v.val);
-                        serverLog(LL_NOTICE,"Entry->val_len: %s", (char*)tmp->val_len);
+                        serverLog(LL_NOTICE,"Entry->val_len: %d", *(int*)tmp->val_len);
                         addReplyBulk(c,c->argv[5]);   
                         parity_flag = 1;
                     }
@@ -1500,72 +1513,10 @@ void processInputBuffer(client *c) {
             case PARIYT_DATANODE_TRANSFORM_VALUE:
                 serverLog(LL_NOTICE,"in the PARIYT_DATANODE_TRANSFORM_VALUE");
 
-                tmp = dictFindParity(server.parityDict, c->argv[3]->ptr);
-                addReplyBulkCString(c, (char *)tmp->v.val);
-                serverLog(LL_NOTICE,"the 7001.value is %s", (char *)tmp->v.val);
-
-                parity_flag = 1;
-                break;
-
-            case PARIYT_DATANODE_TRANSFORM_DATA:
-                serverLog(LL_NOTICE,"in the PARIYT_DATANODE_TRANSFORM_DATA");
-
-                serverLog(LL_NOTICE,"before the dictFindParity, the cnt is %s",(char *)c->argv[3]->ptr);
-                serverLog(LL_NOTICE,"before the dictFindParity, the cnt type is %d",c->argv[3]->type);
-
-                dictIterator *di;
-                dictEntry *de;
-
-                di = dictGetSafeIterator(server.CntKeyDict);
-                while((de = dictNext(di)) != NULL) {
-                    serverLog(LL_NOTICE,"in the dictIterator of CntKeyDict, Entry->cnt: %s", (char *)de->stat_set_commands);
-                    serverLog(LL_NOTICE,"in the dictIterator of CntKeyDict, Entry->key: %s", (char *)de->key);
-                }
-
-                char *tmpCnt = (char *) malloc(sizeof(char)*32);
-                strcpy(tmpCnt, (char *)c->argv[3]->ptr);
-                dictEntry *tmpKey = dictFindParity(server.CntKeyDict, tmpCnt);
-                if(tmpKey!=NULL){
-                    serverLog(LL_NOTICE,"in the PARIYT_DATANODE_TRANSFORM_DATA, and the tmpKey Entry:");
-                    serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmpKey->stat_set_commands);
-                    serverLog(LL_NOTICE,"Entry->key: %s", (char *)tmpKey->key);
-                }
-                else{
-                    serverLog(LL_NOTICE,"The tmpKey entry is empty");
-                } 
-
-                di = dictGetSafeIterator(server.db->dict);
-                while((de = dictNext(di)) != NULL) {
-                    serverLog(LL_NOTICE,"in the dictIterator of server.db->dict, Entry->cnt: %s", (char *)de->stat_set_commands);
-                    serverLog(LL_NOTICE,"in the dictIterator of server.db->dict, Entry->key: %s", (char *)de->key);
-                    serverLog(LL_NOTICE,"in the dictIterator of server.db->dict, Entry->val: %s", (char *)de->v.val);
-                }
-
-                tmp = dictFind(c->db->dict, tmpKey->key);
-                if(tmp!=NULL){
-                    serverLog(LL_NOTICE,"in the PARIYT_DATANODE_TRANSFORM_DATA, and the tmp Entry:");
-                    robj *val = dictGetVal(tmp);
-                    //serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmp->stat_set_commands);
-                    serverLog(LL_NOTICE,"Entry->key: %s", (char*)tmp->key);
-                    serverLog(LL_NOTICE,"Entry->val: %s", (char *)(getDecodedObject(val) -> ptr));
-                    //serverLog(LL_NOTICE,"Entry->val: %s", (char*)tmp->v.val);
-                    //serverLog(LL_NOTICE,"Entry->val_len: %s", (char*)tmp->val_len);
-                }
-                else{
-                    serverLog(LL_NOTICE,"The tmp entry is empty");
-                }  
-
-                // robj *o = lookupKeyRead(c->db, key); 
-
-
-                char *sendStr = (char *) malloc(sizeof(char)*100);
-                memset(sendStr,0,sizeof(char)*100);
-                strcat(sendStr, (char *)tmp->key);
-                strcat(sendStr, "\r\n");
-                strcat(sendStr, (char *)(getDecodedObject(dictGetVal(tmp)) -> ptr));
-                
-                serverLog(LL_NOTICE,"the 7001.key and 7001.value is %s", sendStr);
-                addReplyBulkCString(c, sendStr);
+                tmp = dictFind(server.db->dict, c->argv[1]->ptr);
+                robj *val = dictGetVal(tmp);
+                addReplyBulkCString(c, (char *)(getDecodedObject(val) -> ptr));
+                serverLog(LL_NOTICE,"the 7001.value is %s", (char *)(getDecodedObject(val) -> ptr));
 
                 parity_flag = 1;
                 break;

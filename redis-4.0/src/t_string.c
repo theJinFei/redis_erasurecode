@@ -150,16 +150,9 @@ void setGenericCommand(client *c, int flags, robj *key, robj *val, robj *expire,
         for(int i=0;i<lentmp;i++){
             serverLog(LL_NOTICE, "the NO.%d tmpValue after XOR is %d", i, (int)tmpValue[i]);
         }
-        
-
-        // FILE *fp;
-        // fp = fopen("./tmpValue.bin","wb+");
-        // fprintf(fp,tmpValue);
-        // fclose(fp);
-
 
         //feedParityXOR(c, tmpValue);
-        feedParityXORLen(c,tmpValue,lentmp);
+        feedParityXORLen(c, (char *)key->ptr, tmpValue, lentmp);
 
         free(tmpValue);
         free(oldValue);

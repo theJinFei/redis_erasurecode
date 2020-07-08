@@ -292,12 +292,11 @@ void feedParityARGV(client *cl, const int argc, robj** argv){
     // 这里是不是应该不写这里？应该写db.c 插入到数据库之后，应该计算差值，实现value增量更新。
     const char* parityip = "127.0.0.1";
     const uint16_t port = 7002;
-     // 保证这个只执行一遍
-    serverLog(LL_NOTICE, "the server.port is %d and the port is %d", server.port, port);
+    // 保证这个只执行一遍
+    // serverLog(LL_NOTICE, "the server.port is %d and the port is %d", server.port, port);
     if(server.port != port && !(server.cluster -> myself -> flags & CLUSTER_NODE_SLAVE)){ 
-        serverLog(LL_NOTICE, "the flags is  %d and the CLUSTER_NODE_SLAVE is %d", server.cluster -> myself -> flags, CLUSTER_NODE_SLAVE);
-        
-        serverLog(LL_NOTICE, "after feedParityARGV, the hostip is %s, the server.port is %d and the port is %d", server.bindaddr, server.port, port);
+        // serverLog(LL_NOTICE, "the flags is  %d and the CLUSTER_NODE_SLAVE is %d", server.cluster -> myself -> flags, CLUSTER_NODE_SLAVE);  
+        // serverLog(LL_NOTICE, "after feedParityARGV, the hostip is %s, the server.port is %d and the port is %d", server.bindaddr, server.port, port);
         redisContext *c = redisConnect(parityip, port);
         if (c == NULL || c->err) {
             if (c) {
@@ -315,20 +314,14 @@ void feedParityARGV(client *cl, const int argc, robj** argv){
 
         char *sendStr = (char *) malloc(sizeof(char)*100);
         memset(sendStr,0,sizeof(char)*100);
-        for(int i=0;i<argc - 1;i++){
+
+        for(int i = 0; i < argc - 1; i++){
             if(argv[i]->encoding == OBJ_ENCODING_INT){
-            
                 char buf[32];
-                ll2string(buf,32,(long)argv[i]->ptr);
+                ll2string(buf, 32, (long)argv[i]->ptr);
 
                 serverLog(LL_NOTICE, "int = %s", buf);
                 serverLog(LL_NOTICE, "argv[i]->encoding == OBJ_ENCODING_INT");
-                //*(int *)(argv[i]->ptr)
-                //char *tmpStr = (char *) malloc(sizeof(char)*10);
-                //memset(sendStr,0,sizeof(char)*10);
-                
-                //sprintf(tmpStr,"%d",*(int *)(argv[i]->ptr));
-                //serverLog(LL_NOTICE, "tmpStr = %s", tmpStr);
                 strcat(sendStr,buf);
             }
             else{
@@ -344,17 +337,16 @@ void feedParityARGV(client *cl, const int argc, robj** argv){
         strcat(sendStr," ");
 
         memset(buf, 0, sizeof(char) * 32);
+
         // cnt
         dictEntry *entry = dictFind(cl->db->dict, argv[1]->ptr);
         serverLog(LL_NOTICE, "in the feedParityARGV, the entry->stat_set_commands = %d", *(int *)entry->stat_set_commands);
-
-        //buf = (char *)entry->stat_set_commands;
-        // sprintf(buf, "%d", *(int *)entry->stat_set_commands); ????
         ll2string(buf,32, *(int *)entry->stat_set_commands);
         strcat(sendStr,buf);
         strcat(sendStr," ");
 
         serverLog(LL_NOTICE, "before sendStr = %s, the argc is %d",sendStr, argc);
+
         // 最后一个 解析 value
         if(argv[argc - 1]->encoding == OBJ_ENCODING_INT){
             // char buf[32];
@@ -362,47 +354,54 @@ void feedParityARGV(client *cl, const int argc, robj** argv){
             ll2string(buf,32,(long)argv[argc - 1]->ptr);
 
             // 长度
+            // char bufflen[32];
+            // memset(bufflen, 0, sizeof(char) * 32);
+            // ll2string(bufflen,32,strlen(buf));
+            // strcat(sendStr, bufflen);
+            // strcat(sendStr, " ");
+
+            int tmpPort = server.port;
             char bufflen[32];
             memset(bufflen, 0, sizeof(char) * 32);
-            ll2string(bufflen,32,strlen(buf));
+            ll2string(bufflen,32,tmpPort);
             strcat(sendStr, bufflen);
             strcat(sendStr, " ");
+
 
             // 真正的内容
             strcat(sendStr,buf);
         }else{
+            
             // 长度
+            // char bufflen[32];
+            // memset(bufflen, 0, sizeof(char) * 32);
+            // ll2string(bufflen,32,strlen((char*)(argv[argc - 1]->ptr)));
+            // strcat(sendStr, bufflen);
+            // strcat(sendStr, " ");
+
+            int tmpPort = server.port;
             char bufflen[32];
             memset(bufflen, 0, sizeof(char) * 32);
-            ll2string(bufflen,32,strlen((char*)(argv[argc - 1]->ptr)));
+            ll2string(bufflen,32,tmpPort);
             strcat(sendStr, bufflen);
             strcat(sendStr, " ");
 
             strcat(sendStr,(char*)(argv[argc - 1]->ptr));
         }
 
-        serverLog(LL_NOTICE, "before sendStr = %s",sendStr);
+        serverLog(LL_NOTICE, "in the feedParityARGV, the sendStr = %s",sendStr);
 
-        // redisAppendCommand(c,"set foo bar 1");
         // set key flag cnt len value
         redisAppendCommand(c,sendStr);
 
-        //redisAppendCommand(c,"set foo bar");
-
-        //serverLog(LL_NOTICE, "after redisAppendCommand, the server.stat_numsetcommands = %d", server.stat_numsetcommands);
-
         serverLog(LL_NOTICE, "sendStr = %s",sendStr);
 
-        /*添加命令get */
-        // redisAppendCommand(c,"GET foo2");
         /*获取set命令结果*/
         redisGetReply(c,&reply); // reply for SET
         serverLog(LL_NOTICE, "in the feedParityARGV, the reply is %s", reply -> str);
         freeReplyObject(reply);
         redisFree(c);
-
     }
-
 }
 
 void feedParityXOR(client* cl, const char* parityXOR)
@@ -478,7 +477,7 @@ void feedParityXOR(client* cl, const char* parityXOR)
     }
 }
 
-void feedParityXORLen(client *cl, const char* parityXOR, int len){
+void feedParityXORLen(client *cl, const char* key, const char* parityXOR, int len){
     // 把这个XOR增量进行发送即可
     const char* parityip = "127.0.0.1";
     const uint16_t port = 7002;
@@ -521,9 +520,9 @@ void feedParityXORLen(client *cl, const char* parityXOR, int len){
         sendStr = sdscatlen(sendStr, "\r\n", sizeof("\r\n")-1);
 
         // key
-        argc = 5;
+        argc = strlen(key);
         sendStr = sdscatfmt(sendStr, "$%u\r\n", argc);
-        sendStr = sdscatlen(sendStr, "mykey", argc);
+        sendStr = sdscatlen(sendStr, key, argc);
         sendStr = sdscatlen(sendStr, "\r\n", sizeof("\r\n")-1);     
         
         // flag
