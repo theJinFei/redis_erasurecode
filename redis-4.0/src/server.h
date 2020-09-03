@@ -1869,10 +1869,7 @@ int dbDelete(redisDb *db, robj *key);
 robj *dbUnshareStringValue(redisDb *db, robj *key, robj *o);
 
 # ifdef _ERASURE_CODE_
-// void dbAddParity(redisDb *db, robj *key, robj *val, robj *cnt, robj *len);
-// void dbOverwriteParity(redisDb *db, robj *key, robj *val, robj *cnt, robj *len);
-// void dbUpdateParity(redisDb *db, robj *key, robj *val, robj *cnt, robj *len);
-void dbRecovery(redisDb *db, dictEntry *de, char *key, char *value);
+void dbRecovery(redisDb *db, dictEntry *de, char *key, char *tmpdata1, char *tmpdata4);
 # endif
 
 #define EMPTYDB_NO_FLAGS 0      /* No flags. */

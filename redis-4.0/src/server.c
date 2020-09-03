@@ -2661,7 +2661,6 @@ void insertKeyCntDict(client* c)
         //已经有过的key
         serverLog(LL_NOTICE,"KeyCntDict isn't NULL and return");
     }
-
 }
 
 int insertCntKeyDict(client* c){
@@ -2715,7 +2714,9 @@ int processEncodeCommand(client *c, int keyFlag){
         serverLog(LL_NOTICE,"dictFindParity is NULL and dbAddParity");
 
         sds copy = sdsdup(c->argv[3]->ptr);
-        erasure_encode_firstkey(server.parityDict, copy, c->argv[5]->ptr, keyFlag);
+        if(erasure_encode_firstkey(server.parityDict, copy, c->argv[5]->ptr, keyFlag) != C_OK){
+            return C_ERR;
+        }
     } else {
         //已经有过的cnt
         //另一个data node的同cnt命令，做校验后插入
@@ -2727,9 +2728,10 @@ int processEncodeCommand(client *c, int keyFlag){
         // int flag = 1;
         // dictReplaceParity(server.parityDict, c->argv[3]->ptr, c->argv[1]->ptr, c->argv[5]->ptr, tmpCnt, flag);
         sds copy = sdsdup(c->argv[3]->ptr);
-        erasure_encode_anotherkey(server.parityDict, copy, c->argv[5]->ptr, NULL, keyFlag);
+        if(erasure_encode_anotherkey(server.parityDict, copy, c->argv[5]->ptr, NULL, keyFlag) != C_OK){
+            return C_ERR;
+        }
     }
-
     return C_OK;
 }
 
@@ -2825,139 +2827,64 @@ int processReplyGet(client *c){
 
 int processRecoverySignalData(client *c){
     const char* parityip = "127.0.0.1";
-    const uint16_t port = 7001;
+    int port = 7001;
 
-    redisContext *cl = redisConnect(parityip, port);
-
-    char *sendStr = (char *) malloc(sizeof(char)*100);
-    memset(sendStr,0,sizeof(char)*100);
-    char buf[32];
-
-    // set 
-    strcat(sendStr,"SET ");
-
-    // key
     dictEntry *tmpCnt = dictFind(server.KeyCntDict, c->argv[1]->ptr);
-    // serverLog(LL_NOTICE, "in the processRecoverySignalData, the tmpCnt = %s", (char *)tmpCnt->stat_set_commands);
+    serverLog(LL_NOTICE, "in the processRecoverySignalData, the tmpCnt = %s", (char *)tmpCnt->stat_set_commands);
+    
     dictEntry *tmpKey = dictFindParity(server.CntKeyDict, tmpCnt->stat_set_commands);
-    // serverLog(LL_NOTICE, "in the processRecoverySignalData, the tmpKey = %s", (char *)tmpKey->v.val);
-    if(tmpKey->v.val == NULL){
-        dictEntry *reply_entry = dictFindParity(server.parityDict, tmpCnt->stat_set_commands);
+    serverLog(LL_NOTICE, "in the processRecoverySignalData, the tmpKey = %s", (char *)tmpKey->v.val);
+
+    dictEntry *reply_entry = dictFindParity(server.parityDict, tmpCnt->stat_set_commands);
+
+    int flag1 = (tmpKey->v.val == NULL)? 0:1;
+    int flag4 = (tmpKey->val_len == NULL)? 0:1;
+
+    int valLen = *(int*)reply_entry->val_len;
+    serverLog(LL_NOTICE, "the valLen is %d", valLen);
+
+    char *tmpdata1 = talloc(char, sizeof(char)*valLen);
+    char *tmpdata4 = talloc(char, sizeof(char)*valLen);
+    memset(tmpdata1,0,sizeof(char)*valLen);
+    memset(tmpdata4,0,sizeof(char)*valLen);
+    
+    if((flag1 == 0) && (flag4 == 0)){
         addReplyBulkCString(c, (char *)reply_entry->v.val);
         serverLog(LL_NOTICE, "in the processRecoverySignalData, reply value directly, the value = %s", (char *)reply_entry->v.val);
         return C_OK;
     }
-    strcat(sendStr,(char *)tmpKey->v.val);
-    strcat(sendStr," ");
 
-    // flag 
-    ll2string(buf,32,(long)PARIYT_DATANODE_TRANSFORM_VALUE); //通知其他数据结点节点发送value
-    strcat(sendStr,buf);
-    strcat(sendStr," ");
-    
-    // cnt
-    memset(buf, 0, sizeof(char) * 32);
-    strcat(sendStr,(char *)tmpCnt->stat_set_commands);
-    strcat(sendStr," ");
-    
-    // len
-    memset(buf, 0, sizeof(char) * 32);
-    const char* str = "parityXOR";
-    ll2string(buf,32, strlen(str));
-    strcat(sendStr,buf);
-    strcat(sendStr," ");
-    
-    // xorvalue
-    strcat(sendStr, str);
-
-    serverLog(LL_NOTICE, "in the processRecoverySignalData, the sendStr = %s", sendStr);
-
-    redisAppendCommand(cl,sendStr);
-
-    /*获取set命令结果*/
-    redisReply *reply;
-    redisGetReply(cl,(void **)&reply); // 7001.value
-    serverLog(LL_NOTICE, "in the processRecoverySignalData, the reply/7001.value is %s", reply->str);
-    redisFree(cl);
-
-    //val = reply->str
-    //做异或，得到需要恢复的value
-
-    dictEntry *tmp = dictFindParity(server.parityDict, tmpCnt->stat_set_commands);
-
-    int lenValNew = strlen(reply->str);//新value, 7001.value
-    int lenValOld = *(int*)tmp->val_len;//旧value, 7002.value
-
-    serverLog(LL_NOTICE,"the lenValOld = %d, the lenValNew = %d", lenValOld, lenValNew);
-
-    int lenvaltmp = (lenValOld>lenValNew)?lenValOld:lenValNew;
-
-    char *tmpValue = (char *)malloc(lenvaltmp*sizeof(char));
-    memset(tmpValue,0,(sizeof(char))*lenvaltmp);
-
-    for(int i = 0; i < lenValOld; i++){
-        tmpValue[i] ^= ((char*)tmp->v.val)[i];
-    }
-    for(int i = 0; i < lenValNew; i++){
-        tmpValue[i] ^= reply->str[i];
-    }
-
-    serverLog(LL_NOTICE, "the tmpValue after XOR is %s", tmpValue);
-    for(int i=0;i<lenvaltmp;i++){
-        serverLog(LL_NOTICE, "the NO.%d tmpValue after XOR is %d", i, (int)tmpValue[i]);
-    }
-
-    addReplyBulkCString(c,tmpValue);
-
-    freeReplyObject(tmpValue);
-    free(tmpValue);
-
-    return C_OK;
-}
-
-int processRecoveryAll(client *c){
-
-    dictIterator *di;
-    dictEntry *de;
-    unsigned long numcnts = 0;
-    
-    const char* parityip = "127.0.0.1";
-    const uint16_t port = 7001;
-
-    di = dictGetSafeIterator(server.parityDict);
-    while((de = dictNext(di)) != NULL) {
-        numcnts++;
+    for(port = 7001; port<=7004; port=port+3){
+        if(((port==7001)&&(flag1==0))||((port==7004)&&(flag4==0))){
+            continue;
+        }
 
         redisContext *cl = redisConnect(parityip, port);
 
         char *sendStr = (char *) malloc(sizeof(char)*100);
         memset(sendStr,0,sizeof(char)*100);
+        char buf[32];
 
         // set 
-        strcat(sendStr,"get ");
+        strcat(sendStr,"SET ");
 
-        // key
-        dictEntry *tmpKey = dictFindParity(server.CntKeyDict, de->stat_set_commands);
-
-        if(tmpKey->v.val == NULL){
-            dictEntry *recovery_entry = dictFindParity(server.parityDict, de->stat_set_commands);
-            dictAddRecovery(server.db->dict, recovery_entry->key, recovery_entry->v.val, recovery_entry->stat_set_commands);
-            serverLog(LL_NOTICE, "in the processRecoveryAll, recovery value directly, the value = %s", (char *)recovery_entry->v.val);
-            continue;
+        // key        
+        if(port == 7001){
+            strcat(sendStr,(char *)tmpKey->v.val);
         }
-
-        strcat(sendStr,(char *)tmpKey->v.val);
+        else{
+            strcat(sendStr,(char *)tmpKey->val_len);
+        }
         strcat(sendStr," ");
 
-
         // flag 
-        char buf[32];
         ll2string(buf,32,(long)PARIYT_DATANODE_TRANSFORM_VALUE); //通知其他数据结点节点发送value
         strcat(sendStr,buf);
         strcat(sendStr," ");
         
         // cnt
-        strcat(sendStr,(char *)de->stat_set_commands);
+        memset(buf, 0, sizeof(char) * 32);
+        strcat(sendStr,(char *)tmpCnt->stat_set_commands);
         strcat(sendStr," ");
         
         // len
@@ -2970,29 +2897,251 @@ int processRecoveryAll(client *c){
         // xorvalue
         strcat(sendStr, str);
 
-        serverLog(LL_NOTICE, "in the processRecoveryAll, the sendStr = %s", sendStr);
+        serverLog(LL_NOTICE, "in the processRecoverySignalData, the sendStr = %s", sendStr);
 
         redisAppendCommand(cl,sendStr);
 
         /*获取set命令结果*/
         redisReply *reply;
         redisGetReply(cl,(void **)&reply); // 7001.value
-        serverLog(LL_NOTICE, "in the processRecoveryAll, the reply(7001.value) is %s", reply->str);
-        redisFree(cl);
+        serverLog(LL_NOTICE, "in the processRecoverySignalData, the reply is %s, and the len is %d", reply->str, strlen(reply->str));
+        if(port == 7001){
+            // tmpdata1 = (char *)malloc(sizeof(char)*strlen(reply->str));
+            // memset(tmpdata1, 0, (sizeof(char))*(strlen(reply->str))); 
+            // serverLog(LL_NOTICE, "before the memcpy, the tmpdata1 is %s", tmpdata1);
+            // memcpy(tmpdata1, reply->str, strlen(reply->str));
+            strcpy(tmpdata1, reply->str);
+            serverLog(LL_NOTICE, "in the processRecoverySignalData, the tmpdata1 is %s", tmpdata1);
+        }
+        else{
+            // tmpdata4 = (char *)malloc(sizeof(char)*strlen(reply->str));
+            // memset(tmpdata4, 0, (sizeof(char))*(strlen(reply->str))); 
+            // serverLog(LL_NOTICE, "before the memcpy, the tmpdata4 is %s", tmpdata4);
+            // memcpy(tmpdata4, reply->str, strlen(reply->str));
+            strcpy(tmpdata4, reply->str);
+            serverLog(LL_NOTICE, "in the processRecoverySignalData, the tmpdata4 is %s", tmpdata4);
+        }
 
-        // int agc = 2;
-        // sds *agv;
-        // sds aux = sdsnew(reply->str);
-        // agv = sdssplitargs(aux,&agc);
-
-        // serverLog(LL_NOTICE, "in the processRecoveryAll, the 7001.key is %s", agv[0]);
-        // serverLog(LL_NOTICE, "in the processRecoveryAll, the 7001.value is %s", agv[1]);
-
-        //val = reply->str
-        //做异或，得到需要恢复的value
-        dbRecovery(server.db, de, (char *)tmpKey->key, reply->str);
-        
         freeReplyObject(reply);
+        redisFree(cl);  
+    }
+
+    // 7001, data[1], tmpdata1
+    // 7004, data[2], tmpdata4
+    // 7002, coding[0], (char *)reply_entry->v.val
+
+    int *erasures;
+    int dataLen = (strlen(tmpdata1)>strlen(tmpdata4))? strlen(tmpdata1) : strlen(tmpdata4);
+    int len = (dataLen > valLen)? dataLen : valLen;
+
+    int k=3, m=2, w=8;
+    char **data, **coding;
+    int i,j,n;
+    char *recoveryData;
+
+    erasures = talloc(int, (m+1));
+  
+    erasures[0] = 0;
+    erasures[1] = 4;
+    erasures[2] = -1;
+
+    data = talloc(char *, k);
+    for (i = 0; i < k; i++) {
+        data[i] = talloc(char, sizeof(int));//4字节
+        memset(data[i],0,sizeof(int)); 
+    }
+
+    coding = talloc(char *, m);
+    for (i = 0; i < m; i++) {
+        coding[i] = talloc(char, sizeof(int));
+        memset(coding[i],0,sizeof(int)); 
+    }
+
+    if(len <= 4){
+        recoveryData = talloc(char, sizeof(int));
+        memset(recoveryData, 0, sizeof(int)); 
+
+        //memcpy(data[1], tmpdata1, sizeof(int));
+        memcpy(data[1], tmpdata1, strlen(tmpdata1));
+        serverLog(LL_NOTICE,"before the encode, the data[1] is %s and the len is %d", data[1], strlen(data[1]));
+        
+        //memcpy(data[2], tmpdata4, sizeof(int));
+        memcpy(data[2], tmpdata4, strlen(tmpdata4));
+        serverLog(LL_NOTICE,"before the encode, the data[2] is %s and the len is %d", data[2], strlen(data[2]));
+
+        memcpy(coding[0], (char *)reply_entry->v.val, sizeof(int));
+        serverLog(LL_NOTICE,"before the encode, the coding[0] is %s and the len is %d", coding[0], strlen(coding[0]));
+
+        serverLog(LL_NOTICE, "before decode:");
+        serverLog(LL_NOTICE, "data[0]:   %02x %02x %02x %02x", (unsigned char)data[0][0], (unsigned char)data[0][1], (unsigned char)data[0][2], (unsigned char)data[0][3]);
+        serverLog(LL_NOTICE, "data[1]:   %02x %02x %02x %02x", (unsigned char)data[1][0], (unsigned char)data[1][1], (unsigned char)data[1][2], (unsigned char)data[1][3]);
+        serverLog(LL_NOTICE, "data[2]:   %02x %02x %02x %02x", (unsigned char)data[2][0], (unsigned char)data[2][1], (unsigned char)data[2][2], (unsigned char)data[2][3]);
+        serverLog(LL_NOTICE, "coding[0]: %02x %02x %02x %02x", (unsigned char)coding[0][0], (unsigned char)coding[0][1], (unsigned char)coding[0][2], (unsigned char)coding[0][3]);
+        serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
+        
+        jerasure_matrix_decode(k, m, w, server.matrix, 1, erasures, data, coding, sizeof(int));
+
+        serverLog(LL_NOTICE, "after decode:");
+        serverLog(LL_NOTICE, "data[0]:   %02x %02x %02x %02x", (unsigned char)data[0][0], (unsigned char)data[0][1], (unsigned char)data[0][2], (unsigned char)data[0][3]);
+        serverLog(LL_NOTICE, "data[1]:   %02x %02x %02x %02x", (unsigned char)data[1][0], (unsigned char)data[1][1], (unsigned char)data[1][2], (unsigned char)data[1][3]);
+        serverLog(LL_NOTICE, "data[2]:   %02x %02x %02x %02x", (unsigned char)data[2][0], (unsigned char)data[2][1], (unsigned char)data[2][2], (unsigned char)data[2][3]);
+        serverLog(LL_NOTICE, "coding[0]: %02x %02x %02x %02x", (unsigned char)coding[0][0], (unsigned char)coding[0][1], (unsigned char)coding[0][2], (unsigned char)coding[0][3]);
+        serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
+
+        memcpy(recoveryData, data[0], sizeof(int));
+        serverLog(LL_NOTICE,"after the encode, the recoveryData is %s and the len is %d", recoveryData, strlen(recoveryData));
+    }
+
+    else{
+        int time = len/4 + 1;
+        // int lenVal = *(int*)reply_entry->val_len;
+        // serverLog(LL_NOTICE, "the valLen is %d", valLen);
+
+        // char *decodeData1 = talloc(char, sizeof(char)*valLen);
+        // char *decodeData4 = talloc(char, sizeof(char)*valLen);
+        // memset(decodeData1,0,sizeof(char)*valLen);
+        // memset(decodeData4,0,sizeof(char)*valLen);
+        // memcpy(decodeData1, tmpdata1, strlen(tmpdata1));
+        // memcpy(decodeData4, tmpdata4, strlen(tmpdata4));
+        
+        recoveryData = talloc(char, sizeof(char)*valLen);
+        memset(recoveryData, 0, sizeof(int));
+
+        for(n=0; n<time ;n++){
+
+            memcpy(data[1], tmpdata1 + 4*n, sizeof(int));
+            serverLog(LL_NOTICE,"before the encode, the data[1] is %s and the len is %d", data[1], strlen(data[1]));
+            
+            memcpy(data[2], tmpdata4 + 4*n, sizeof(int));
+            serverLog(LL_NOTICE,"before the encode, the data[2] is %s and the len is %d", data[2], strlen(data[2]));
+
+            memcpy(coding[0], ((char *)reply_entry->v.val)+4*n, sizeof(int));
+            serverLog(LL_NOTICE,"before the encode, the coding[0] is %s and the len is %d", coding[0], strlen(coding[0]));
+
+            serverLog(LL_NOTICE, "before decode:");
+            serverLog(LL_NOTICE, "data[0]:   %02x %02x %02x %02x", (unsigned char)data[0][0], (unsigned char)data[0][1], (unsigned char)data[0][2], (unsigned char)data[0][3]);
+            serverLog(LL_NOTICE, "data[1]:   %02x %02x %02x %02x", (unsigned char)data[1][0], (unsigned char)data[1][1], (unsigned char)data[1][2], (unsigned char)data[1][3]);
+            serverLog(LL_NOTICE, "data[2]:   %02x %02x %02x %02x", (unsigned char)data[2][0], (unsigned char)data[2][1], (unsigned char)data[2][2], (unsigned char)data[2][3]);
+            serverLog(LL_NOTICE, "coding[0]: %02x %02x %02x %02x", (unsigned char)coding[0][0], (unsigned char)coding[0][1], (unsigned char)coding[0][2], (unsigned char)coding[0][3]);
+            serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
+            
+            jerasure_matrix_decode(k, m, w, server.matrix, 1, erasures, data, coding, sizeof(int));
+
+            serverLog(LL_NOTICE, "after decode:");
+            serverLog(LL_NOTICE, "data[0]:   %02x %02x %02x %02x", (unsigned char)data[0][0], (unsigned char)data[0][1], (unsigned char)data[0][2], (unsigned char)data[0][3]);
+            serverLog(LL_NOTICE, "data[1]:   %02x %02x %02x %02x", (unsigned char)data[1][0], (unsigned char)data[1][1], (unsigned char)data[1][2], (unsigned char)data[1][3]);
+            serverLog(LL_NOTICE, "data[2]:   %02x %02x %02x %02x", (unsigned char)data[2][0], (unsigned char)data[2][1], (unsigned char)data[2][2], (unsigned char)data[2][3]);
+            serverLog(LL_NOTICE, "coding[0]: %02x %02x %02x %02x", (unsigned char)coding[0][0], (unsigned char)coding[0][1], (unsigned char)coding[0][2], (unsigned char)coding[0][3]);
+            serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
+
+            strcat(recoveryData, data[0]);
+            serverLog(LL_NOTICE,"after the encode, the recoveryData is %s and the len is %d", recoveryData, strlen(recoveryData));     
+        }
+    }
+
+    addReplyBulkCString(c, recoveryData);
+    free(recoveryData);
+
+    return C_OK;
+}
+
+int processRecoveryAll(client *c){
+    dictIterator *di;
+    dictEntry *de;
+    unsigned long numcnts = 0;
+    
+    const char* parityip = "127.0.0.1";
+    int port = 7001;
+
+    di = dictGetSafeIterator(server.parityDict);
+    while((de = dictNext(di)) != NULL) {
+        numcnts++;
+
+        dictEntry *tmpKey = dictFindParity(server.CntKeyDict, de->stat_set_commands);
+
+        int flag1 = (tmpKey->v.val == NULL)? 0:1;
+        int flag4 = (tmpKey->val_len == NULL)? 0:1;
+
+        int valLen = *(int*)de->val_len;
+        serverLog(LL_NOTICE, "the valLen is %d", valLen);
+
+        char *tmpdata1 = talloc(char, sizeof(char)*valLen);
+        char *tmpdata4 = talloc(char, sizeof(char)*valLen);
+        memset(tmpdata1,0,sizeof(char)*valLen);
+        memset(tmpdata4,0,sizeof(char)*valLen);
+
+        if((flag1 == 0) && (flag4 == 0)){
+            // addReplyBulkCString(c, (char *)de->v.val);
+            dictAddRecovery(server.db->dict, tmpKey->key, de->v.val, de->stat_set_commands);
+            serverLog(LL_NOTICE, "in the processRecoveryAll, Add value directly, the value = %s", (char *)de->v.val);
+            continue;
+        }
+
+        for(port = 7001; port<=7004; port=port+3){
+            if(((port==7001)&&(flag1==0))||((port==7004)&&(flag4==0))){
+                continue;
+            }
+
+            redisContext *cl = redisConnect(parityip, port);
+
+            char *sendStr = (char *) malloc(sizeof(char)*100);
+            memset(sendStr,0,sizeof(char)*100);
+            char buf[32];
+
+            // set 
+            strcat(sendStr,"SET ");
+
+            // key        
+            if(port == 7001){
+                strcat(sendStr,(char *)tmpKey->v.val);
+            }
+            else{
+                strcat(sendStr,(char *)tmpKey->val_len);
+            }
+            strcat(sendStr," ");
+
+            // flag 
+            ll2string(buf,32,(long)PARIYT_DATANODE_TRANSFORM_VALUE); //通知其他数据结点节点发送value
+            strcat(sendStr,buf);
+            strcat(sendStr," ");
+            
+            // cnt
+            memset(buf, 0, sizeof(char) * 32);
+            strcat(sendStr,(char *)de->stat_set_commands);
+            strcat(sendStr," ");
+            
+            // len
+            memset(buf, 0, sizeof(char) * 32);
+            const char* str = "parityXOR";
+            ll2string(buf,32, strlen(str));
+            strcat(sendStr,buf);
+            strcat(sendStr," ");
+            
+            // xorvalue
+            strcat(sendStr, str);
+
+            serverLog(LL_NOTICE, "in the processRecoveryAll, the sendStr = %s", sendStr);
+
+            redisAppendCommand(cl,sendStr);
+
+            /*获取set命令结果*/
+            redisReply *reply;
+            redisGetReply(cl,(void **)&reply); // 7001.value
+            serverLog(LL_NOTICE, "in the processRecoverySignalData, the reply is %s, and the len is %d", reply->str, strlen(reply->str));
+            if(port == 7001){
+                strcpy(tmpdata1, reply->str);
+                serverLog(LL_NOTICE, "in the processRecoverySignalData, the tmpdata1 is %s", tmpdata1);
+            }
+            else{
+                strcpy(tmpdata4, reply->str);
+                serverLog(LL_NOTICE, "in the processRecoverySignalData, the tmpdata4 is %s", tmpdata4);
+            }
+
+            freeReplyObject(reply);
+            redisFree(cl);
+        }
+
+        dbRecovery(server.db, de, (char *)tmpKey->key, tmpdata1, tmpdata4);
     }
     dictReleaseIterator(di);
 
@@ -3062,23 +3211,32 @@ int erasure_encode_firstkey(dict *d, void *cnt, void *val, int keyFlag){
         }
 
         jerasure_matrix_encode(k, m, w, server.matrix, data, coding, sizeof(int));
-        serverLog(LL_NOTICE,"after the encode, the coding[0] is %s and the len is %d", coding[0], strlen(coding[0]));
 
         if(server.port == 7002){
+            serverLog(LL_NOTICE,"after the encode, the coding[0] is %s and the len is %d", coding[0], strlen(coding[0]));
             memcpy(tmpval_1, coding[0], sizeof(int));
             serverLog(LL_NOTICE,"after the encode, the tmpval_1 is %s and the len is %d", tmpval_1, strlen(tmpval_1));
         }
         else if(server.port == 7003){
+            serverLog(LL_NOTICE,"after the encode, the coding[1] is %s and the len is %d", coding[1], strlen(coding[1]));
             memcpy(tmpval_1, coding[1], sizeof(int));
             serverLog(LL_NOTICE,"after the encode, the tmpval_1 is %s and the len is %d", tmpval_1, strlen(tmpval_1));
         }
         else{
             return C_ERR;
         }
+
+        serverLog(LL_NOTICE, "data[0]:   %02x %02x %02x %02x", (unsigned char)data[0][0], (unsigned char)data[0][1], (unsigned char)data[0][2], (unsigned char)data[0][3]);
+        serverLog(LL_NOTICE, "data[1]:   %02x %02x %02x %02x", (unsigned char)data[1][0], (unsigned char)data[1][1], (unsigned char)data[1][2], (unsigned char)data[1][3]);
+        serverLog(LL_NOTICE, "data[2]:   %02x %02x %02x %02x", (unsigned char)data[2][0], (unsigned char)data[2][1], (unsigned char)data[2][2], (unsigned char)data[2][3]);
+        serverLog(LL_NOTICE, "coding[0]: %02x %02x %02x %02x", (unsigned char)coding[0][0], (unsigned char)coding[0][1], (unsigned char)coding[0][2], (unsigned char)coding[0][3]);
+        serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
+
     }
 
     else{
-        int time = len/4 + 1;
+        //int time = len/4 + 1;
+        int time = (len%4 == 0)? len/4 : len/4 + 1;
 
         tmpval = talloc(char *, time);
         for (i = 0; i < time; i++) {
@@ -3107,13 +3265,15 @@ int erasure_encode_firstkey(dict *d, void *cnt, void *val, int keyFlag){
                     break;
             }
             jerasure_matrix_encode(k, m, w, server.matrix, data, coding, sizeof(int));
-            serverLog(LL_NOTICE,"after the encode, the coding[0] is %s and the len is %d", coding[0], strlen(coding[0]));
+            
 
             if(server.port == 7002){
+                serverLog(LL_NOTICE,"after the encode, the coding[0] is %s and the len is %d", coding[0], strlen(coding[0]));
                 memcpy(tmpval[n], coding[0], sizeof(int));
                 serverLog(LL_NOTICE,"after the encode, the tmpval[n] is %s and the len is %d", tmpval[n], strlen(tmpval[n]));
             }
             else if(server.port == 7003){
+                serverLog(LL_NOTICE,"after the encode, the coding[1] is %s and the len is %d", coding[1], strlen(coding[1]));
                 memcpy(tmpval[n], coding[1], sizeof(int));
                 serverLog(LL_NOTICE,"after the encode, the tmpval[n] is %s and the len is %d", tmpval[n], strlen(tmpval[n]));
             }
@@ -3122,12 +3282,31 @@ int erasure_encode_firstkey(dict *d, void *cnt, void *val, int keyFlag){
             }
             strcat(tmpval_1, tmpval[n]);
             serverLog(LL_NOTICE, "after encode, the tmpval_1 is %s", tmpval_1);
+
+            serverLog(LL_NOTICE, "data[0]:   %02x %02x %02x %02x", (unsigned char)data[0][0], (unsigned char)data[0][1], (unsigned char)data[0][2], (unsigned char)data[0][3]);
+            serverLog(LL_NOTICE, "data[1]:   %02x %02x %02x %02x", (unsigned char)data[1][0], (unsigned char)data[1][1], (unsigned char)data[1][2], (unsigned char)data[1][3]);
+            serverLog(LL_NOTICE, "data[2]:   %02x %02x %02x %02x", (unsigned char)data[2][0], (unsigned char)data[2][1], (unsigned char)data[2][2], (unsigned char)data[2][3]);
+            serverLog(LL_NOTICE, "coding[0]: %02x %02x %02x %02x", (unsigned char)coding[0][0], (unsigned char)coding[0][1], (unsigned char)coding[0][2], (unsigned char)coding[0][3]);
+            serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
+
+            //serverLog(LL_NOTICE, "final coding[0]: %02x %02x %02x %02x", (unsigned char)tmpval[0], (unsigned char)tmpval[1], (unsigned char)tmpval[2], (unsigned char)tmpval[3]);
+
+        }
+
+        for(int count = 0; count < strlen(tmpval_1); count+=4){
+            serverLog(LL_NOTICE, "final coding result: %02x %02x %02x %02x",
+             (unsigned char)tmpval_1[count], (unsigned char)tmpval_1[count+1], 
+             (unsigned char)tmpval_1[count+2], (unsigned char)tmpval_1[count+3]);
         }
     }
-
+    serverLog(LL_NOTICE, "test1");
     int * tmpCnt = (int *)malloc(strlen(tmpval_1)*sizeof(int));
+    serverLog(LL_NOTICE, "test2");
     * tmpCnt = strlen(tmpval_1);
+    serverLog(LL_NOTICE, "test3");
     dictAddParity(d, cnt, NULL, tmpval_1, tmpCnt);
+    serverLog(LL_NOTICE, "test4");
+
     return C_OK;
 }
 
@@ -3206,10 +3385,18 @@ int erasure_encode_anotherkey(dict *d, void *cnt, void *val, void *val_len, int 
         else{
             return C_ERR;
         }
+
+        serverLog(LL_NOTICE, "data[0]:   %02x %02x %02x %02x", (unsigned char)data[0][0], (unsigned char)data[0][1], (unsigned char)data[0][2], (unsigned char)data[0][3]);
+        serverLog(LL_NOTICE, "data[1]:   %02x %02x %02x %02x", (unsigned char)data[1][0], (unsigned char)data[1][1], (unsigned char)data[1][2], (unsigned char)data[1][3]);
+        serverLog(LL_NOTICE, "data[2]:   %02x %02x %02x %02x", (unsigned char)data[2][0], (unsigned char)data[2][1], (unsigned char)data[2][2], (unsigned char)data[2][3]);
+        serverLog(LL_NOTICE, "coding[0]: %02x %02x %02x %02x", (unsigned char)coding[0][0], (unsigned char)coding[0][1], (unsigned char)coding[0][2], (unsigned char)coding[0][3]);
+        serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
+
     }
 
     else{
-        int time = len/4 + 1;
+        //int time = len/4 + 1;
+        int time = (len%4 == 0)? len/4 : len/4 + 1;
 
         tmpval = talloc(char *, time);
         for (i = 0; i < time; i++) {
@@ -3253,7 +3440,23 @@ int erasure_encode_anotherkey(dict *d, void *cnt, void *val, void *val_len, int 
             }
             strcat(tmpval_1, tmpval[n]);
             serverLog(LL_NOTICE, "after encode, the tmpval_1 is %s", tmpval_1);
+        
+        
+            serverLog(LL_NOTICE, "data[0]:   %02x %02x %02x %02x", (unsigned char)data[0][0], (unsigned char)data[0][1], (unsigned char)data[0][2], (unsigned char)data[0][3]);
+            serverLog(LL_NOTICE, "data[1]:   %02x %02x %02x %02x", (unsigned char)data[1][0], (unsigned char)data[1][1], (unsigned char)data[1][2], (unsigned char)data[1][3]);
+            serverLog(LL_NOTICE, "data[2]:   %02x %02x %02x %02x", (unsigned char)data[2][0], (unsigned char)data[2][1], (unsigned char)data[2][2], (unsigned char)data[2][3]);
+            serverLog(LL_NOTICE, "coding[0]: %02x %02x %02x %02x", (unsigned char)coding[0][0], (unsigned char)coding[0][1], (unsigned char)coding[0][2], (unsigned char)coding[0][3]);
+            serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
+
+            //serverLog(LL_NOTICE, "final coding[0]: %02x %02x %02x %02x", (unsigned char)tmpval[0], (unsigned char)tmpval[1], (unsigned char)tmpval[2], (unsigned char)tmpval[3]);
         }
+
+        for(int count = 0; count < sizeof(int)*time; count+=4){
+            serverLog(LL_NOTICE, "final coding result: %02x %02x %02x %02x",
+             (unsigned char)tmpval_1[count], (unsigned char)tmpval_1[count+1], 
+             (unsigned char)tmpval_1[count+2], (unsigned char)tmpval_1[count+3]);
+        }
+
     }
 
     // 校验Value
@@ -3276,8 +3479,13 @@ int erasure_encode_anotherkey(dict *d, void *cnt, void *val, void *val_len, int 
     serverLog(LL_NOTICE,"before Set Parity Val, the tmpValue is %s",tmpValue);
     // 设置新的val
     dictSetVal(d, codeEntry, tmpValue);
-
     serverLog(LL_NOTICE,"after Set Parity Val, the NewValue is %s",(char *)codeEntry->v.val);
+
+    for(int count = 0; count < lenvaltmp; count+=4){
+        serverLog(LL_NOTICE, "final coding result: %02x %02x %02x %02x",
+            (unsigned char)tmpValue[count], (unsigned char)tmpValue[count+1], 
+            (unsigned char)tmpValue[count+2], (unsigned char)tmpValue[count+3]);
+    }
 
     // 设置新的val_len
     int tmpLen = (lenValOld>lenValNew)?lenValOld:lenValNew;

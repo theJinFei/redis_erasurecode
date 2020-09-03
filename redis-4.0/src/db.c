@@ -180,44 +180,113 @@ void dbAdd(redisDb *db, robj *key, robj *val) {
  }
 
 #ifdef _ERASURE_CODE_
-// void dbAddParity(redisDb *db, robj *key, robj *val, robj *cnt, robj *len){
-//     sds copy = sdsdup(cnt->ptr);
+void dbRecovery(redisDb *db, dictEntry *de, char *key, char *tmpdata1, char *tmpdata4){
 
-//     //serverLog(LL_NOTICE,"in the dbAddParity before, the key is %s",(char *)key->ptr);
-//     //serverLog(LL_NOTICE,"in the dbAddParity before, the val is %s",(char *)val->ptr);
-//     int retval = dictAddParity(db->dict, copy, key->ptr, val->ptr, len->ptr);
-    
-//     if (server.cluster_enabled) slotToKeyAdd(cnt);
-// }
+    int *erasures;
+    int dataLen = (strlen(tmpdata1)>strlen(tmpdata4))? strlen(tmpdata1) : strlen(tmpdata4);
+    int valLen = *(int*)de->val_len;
+    int len = (dataLen > valLen)? dataLen : valLen;
 
-void dbRecovery(redisDb *db, dictEntry *de, char *key, char *value){
-    // 恢复key
+    int k=3, m=2, w=8;
+    char **data, **coding;
+    int i,j,n;
+    char *recoveryData;
 
-    serverLog(LL_NOTICE,"before Set Recovery Key, the tmpKey is %s", key);
-    
-    // 恢复value
-    int lenValNew = strlen(value);//新value, 7001.value
-    int lenValOld = *(int*)de->val_len;//旧value, 7002.value
+    erasures = talloc(int, (m+1));
+  
+    erasures[0] = 0;
+    erasures[1] = 4;
+    erasures[2] = -1;
 
-    serverLog(LL_NOTICE, "before Recovery Value, the 7001.value is %s", value);
-    serverLog(LL_NOTICE, "before Recovery Value, the 7002.value is %s", (char*)de->v.val);
-
-    int lenvaltmp = (lenValOld>lenValNew)?lenValOld:lenValNew;
-
-    char *tmpValue = (char *)malloc(lenvaltmp*sizeof(char));
-    memset(tmpValue,0,(sizeof(char))*lenvaltmp);
-
-    for(int i = 0; i < lenValOld; i++){
-        tmpValue[i] ^= ((char*)de->v.val)[i];
-    }
-    for(int i = 0; i < lenValNew; i++){
-        tmpValue[i] ^= value[i];
+    data = talloc(char *, k);
+    for (i = 0; i < k; i++) {
+        data[i] = talloc(char, sizeof(int));//4字节
+        memset(data[i],0,sizeof(int)); 
     }
 
-    serverLog(LL_NOTICE, "before Set Recovery Value, the tmpValue is %s", tmpValue);
+    coding = talloc(char *, m);
+    for (i = 0; i < m; i++) {
+        coding[i] = talloc(char, sizeof(int));
+        memset(coding[i],0,sizeof(int)); 
+    }
 
-    // 插入hash表
-    dictAddRecovery(db->dict, key, tmpValue, de->stat_set_commands);
+    if(len <= 4){
+        recoveryData = talloc(char, sizeof(int));
+        memset(recoveryData, 0, sizeof(int)); 
+
+        //memcpy(data[1], tmpdata1, sizeof(int));
+        memcpy(data[1], tmpdata1, strlen(tmpdata1));
+        serverLog(LL_NOTICE,"before the encode, the data[1] is %s and the len is %d", data[1], strlen(data[1]));
+        
+        //memcpy(data[2], tmpdata4, sizeof(int));
+        memcpy(data[2], tmpdata4, strlen(tmpdata4));
+        serverLog(LL_NOTICE,"before the encode, the data[2] is %s and the len is %d", data[2], strlen(data[2]));
+
+        memcpy(coding[0], (char *)de->v.val, sizeof(int));
+        serverLog(LL_NOTICE,"before the encode, the coding[0] is %s and the len is %d", coding[0], strlen(coding[0]));
+
+        serverLog(LL_NOTICE, "before decode:");
+        serverLog(LL_NOTICE, "data[0]:   %02x %02x %02x %02x", (unsigned char)data[0][0], (unsigned char)data[0][1], (unsigned char)data[0][2], (unsigned char)data[0][3]);
+        serverLog(LL_NOTICE, "data[1]:   %02x %02x %02x %02x", (unsigned char)data[1][0], (unsigned char)data[1][1], (unsigned char)data[1][2], (unsigned char)data[1][3]);
+        serverLog(LL_NOTICE, "data[2]:   %02x %02x %02x %02x", (unsigned char)data[2][0], (unsigned char)data[2][1], (unsigned char)data[2][2], (unsigned char)data[2][3]);
+        serverLog(LL_NOTICE, "coding[0]: %02x %02x %02x %02x", (unsigned char)coding[0][0], (unsigned char)coding[0][1], (unsigned char)coding[0][2], (unsigned char)coding[0][3]);
+        serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
+        
+        jerasure_matrix_decode(k, m, w, server.matrix, 1, erasures, data, coding, sizeof(int));
+
+        serverLog(LL_NOTICE, "after decode:");
+        serverLog(LL_NOTICE, "data[0]:   %02x %02x %02x %02x", (unsigned char)data[0][0], (unsigned char)data[0][1], (unsigned char)data[0][2], (unsigned char)data[0][3]);
+        serverLog(LL_NOTICE, "data[1]:   %02x %02x %02x %02x", (unsigned char)data[1][0], (unsigned char)data[1][1], (unsigned char)data[1][2], (unsigned char)data[1][3]);
+        serverLog(LL_NOTICE, "data[2]:   %02x %02x %02x %02x", (unsigned char)data[2][0], (unsigned char)data[2][1], (unsigned char)data[2][2], (unsigned char)data[2][3]);
+        serverLog(LL_NOTICE, "coding[0]: %02x %02x %02x %02x", (unsigned char)coding[0][0], (unsigned char)coding[0][1], (unsigned char)coding[0][2], (unsigned char)coding[0][3]);
+        serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
+
+        memcpy(recoveryData, data[0], sizeof(int));
+        serverLog(LL_NOTICE,"after the encode, the recoveryData is %s and the len is %d", recoveryData, strlen(recoveryData));
+    }
+
+    else{
+        int time = len/4 + 1;
+        
+        recoveryData = talloc(char, sizeof(char)*valLen);
+        memset(recoveryData, 0, sizeof(int));
+
+        for(n=0; n<time ;n++){
+
+            memcpy(data[1], tmpdata1 + 4*n, sizeof(int));
+            serverLog(LL_NOTICE,"before the encode, the data[1] is %s and the len is %d", data[1], strlen(data[1]));
+            
+            memcpy(data[2], tmpdata4 + 4*n, sizeof(int));
+            serverLog(LL_NOTICE,"before the encode, the data[2] is %s and the len is %d", data[2], strlen(data[2]));
+
+            memcpy(coding[0], ((char *)de->v.val)+4*n, sizeof(int));
+            serverLog(LL_NOTICE,"before the encode, the coding[0] is %s and the len is %d", coding[0], strlen(coding[0]));
+
+            serverLog(LL_NOTICE, "before decode:");
+            serverLog(LL_NOTICE, "data[0]:   %02x %02x %02x %02x", (unsigned char)data[0][0], (unsigned char)data[0][1], (unsigned char)data[0][2], (unsigned char)data[0][3]);
+            serverLog(LL_NOTICE, "data[1]:   %02x %02x %02x %02x", (unsigned char)data[1][0], (unsigned char)data[1][1], (unsigned char)data[1][2], (unsigned char)data[1][3]);
+            serverLog(LL_NOTICE, "data[2]:   %02x %02x %02x %02x", (unsigned char)data[2][0], (unsigned char)data[2][1], (unsigned char)data[2][2], (unsigned char)data[2][3]);
+            serverLog(LL_NOTICE, "coding[0]: %02x %02x %02x %02x", (unsigned char)coding[0][0], (unsigned char)coding[0][1], (unsigned char)coding[0][2], (unsigned char)coding[0][3]);
+            serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
+            
+            jerasure_matrix_decode(k, m, w, server.matrix, 1, erasures, data, coding, sizeof(int));
+
+            serverLog(LL_NOTICE, "after decode:");
+            serverLog(LL_NOTICE, "data[0]:   %02x %02x %02x %02x", (unsigned char)data[0][0], (unsigned char)data[0][1], (unsigned char)data[0][2], (unsigned char)data[0][3]);
+            serverLog(LL_NOTICE, "data[1]:   %02x %02x %02x %02x", (unsigned char)data[1][0], (unsigned char)data[1][1], (unsigned char)data[1][2], (unsigned char)data[1][3]);
+            serverLog(LL_NOTICE, "data[2]:   %02x %02x %02x %02x", (unsigned char)data[2][0], (unsigned char)data[2][1], (unsigned char)data[2][2], (unsigned char)data[2][3]);
+            serverLog(LL_NOTICE, "coding[0]: %02x %02x %02x %02x", (unsigned char)coding[0][0], (unsigned char)coding[0][1], (unsigned char)coding[0][2], (unsigned char)coding[0][3]);
+            serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
+
+            strcat(recoveryData, data[0]);
+            serverLog(LL_NOTICE,"after the encode, the recoveryData is %s and the len is %d", recoveryData, strlen(recoveryData));     
+        }
+    }
+    
+    dictAddRecovery(db->dict, key, recoveryData, de->stat_set_commands); 
+    //free(recoveryData);
+
+    return C_OK;
 }
 
 #endif

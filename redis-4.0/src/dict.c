@@ -313,18 +313,28 @@ int dictAddKeyCnt(dict* d, void* key, void* cnt)
 }
 
 int dictAddCntKey(dict* d, void* cnt, void* key1, void *key2, void *key3){
+    serverLog(LL_NOTICE,"in the dictAddCntKey, before dictAddRawParity");
     dictEntry *entry = dictAddRawParity(d,cnt,NULL); 
 
     if (!entry) {//已经有cnt和一个key了
         dictEntry *tmp_entry = dictFindParity(d, cnt);
+        if(tmp_entry == NULL){
+            serverLog(LL_NOTICE,"in the dictAddCntKey, the tmp_entry is NULL");
+        }
         if(key1 != NULL){
+            serverLog(LL_NOTICE,"in the dictAddCntKey, the key1 isn't NULL, and before dictSet");
             dictSetKey(d, tmp_entry, key1);
+            serverLog(LL_NOTICE,"in the dictAddCntKey, the key1 isn't NULL, and after dictSet");
         }
         else if(key2 != NULL){
+            serverLog(LL_NOTICE,"in the dictAddCntKey, the key2 isn't NULL, and before dictSet");
             dictSetVal(d, tmp_entry, key2);
+            serverLog(LL_NOTICE,"in the dictAddCntKey, the key2 isn't NULL, and after dictSet");
         }
         else if(key3 != NULL){
+            serverLog(LL_NOTICE,"in the dictAddCntKey, the key3 isn't NULL, and before dictSet");
             dictSetLen(d, tmp_entry, key3);
+            serverLog(LL_NOTICE,"in the dictAddCntKey, the key3 isn't NULL, and after dictSet");
         }
         else{
             serverLog(LL_NOTICE, "in the dictAddCntKey, the key1, key2 and key3 NULL");
@@ -354,17 +364,17 @@ int dictAddCntKey(dict* d, void* cnt, void* key1, void *key2, void *key3){
 int dictAddParity(dict *d, void *cnt, void *key, void *val, void *len){
     dictEntry *entry = dictAddRawParity(d,cnt,NULL);  
 
-    //serverLog(LL_NOTICE,"in the dictAddParity, the entry->cnt is %s", (char *)entry->stat_set_commands);
+    serverLog(LL_NOTICE,"in the dictAddParity, the entry->cnt is %s", (char *)entry->stat_set_commands);
 
     if (!entry) return DICT_ERR;
 
-    //serverLog(LL_NOTICE,"in the dictAddParity before, the entry->key is %s", (char *)key);
+    serverLog(LL_NOTICE,"in the dictAddParity before, the entry->key is %s", (char *)key);
     dictSetKey(d, entry, key);
-    //serverLog(LL_NOTICE,"in the dictAddParity after, the entry->key is %s", (char *)entry->key);
+    serverLog(LL_NOTICE,"in the dictAddParity after, the entry->key is %s", (char *)entry->key);
 
-    //serverLog(LL_NOTICE,"in the dictAddParity before, the entry->val is %s", (char *)val);
+    serverLog(LL_NOTICE,"in the dictAddParity before, the entry->val is %s", (char *)val);
     dictSetVal(d, entry, val);
-    //serverLog(LL_NOTICE,"in the dictAddParity after, the entry->val is %s", (char *)entry->v.val);
+    serverLog(LL_NOTICE,"in the dictAddParity after, the entry->val is %s", (char *)entry->v.val);
 
     dictSetLen(d, entry, len);
 
@@ -447,7 +457,9 @@ dictEntry *dictAddRawParity(dict *d, void *cnt, dictEntry **existing){
     dictEntry *entry;
     dictht *ht;
 
-    if (dictIsRehashing(d)) _dictRehashStep(d);
+    serverLog(LL_NOTICE,"in the dictAddRawParity, before ReHash");
+
+    //if (dictIsRehashing(d)) _dictRehashStep(d);
 
     /* Get the index of the new element, or -1 if
      * the element already exists. */
@@ -456,7 +468,7 @@ dictEntry *dictAddRawParity(dict *d, void *cnt, dictEntry **existing){
         return NULL;
     }
 
-    //serverLog(LL_NOTICE,"in the dictAddRawParity, the h = %d",dictHashKey(d,cnt));
+    serverLog(LL_NOTICE,"in the dictAddRawParity, the h = %d",dictHashKey(d,cnt));
 
     /* Allocate the memory and store the new entry.
      * Insert the element in top, with the assumption that in a database
@@ -464,7 +476,7 @@ dictEntry *dictAddRawParity(dict *d, void *cnt, dictEntry **existing){
      * more frequently. */
     ht = dictIsRehashing(d) ? &d->ht[1] : &d->ht[0];
 
-    //serverLog(LL_NOTICE,"in the dictAddRawParity, idx = %d", (dictHashKey(d,cnt)) & (ht->sizemask));
+    serverLog(LL_NOTICE,"in the dictAddRawParity, idx = %d", (dictHashKey(d,cnt)) & (ht->sizemask));
 
     entry = zmalloc(sizeof(*entry));
 
@@ -853,34 +865,40 @@ dictEntry *dictFind(dict *d, const void *key)
 
 #ifdef _ERASURE_CODE_
 dictEntry *dictFindParity(dict *d, const void *cnt){
+    serverLog(LL_NOTICE,"in the dictFindParity");
     dictEntry *he;
     uint64_t h, idx, table;
 
+    serverLog(LL_NOTICE,"in the dictFindParity, before test");
     if (d->ht[0].used + d->ht[1].used == 0) {
-        //serverLog(LL_NOTICE,"in the dictFindParity, d->ht[0].used + d->ht[1].used == 0");
+        serverLog(LL_NOTICE,"in the dictFindParity, d->ht[0].used + d->ht[1].used == 0");
         return NULL; /* dict is empty */
     }
-    if (dictIsRehashing(d)) _dictRehashStep(d);
+    serverLog(LL_NOTICE,"in the dictFindParity, after test");
+
+    serverLog(LL_NOTICE,"in the dictFindParity, before dicthashkey");
+    //if (dictIsRehashing(d)) _dictRehashStep(d);
+    serverLog(LL_NOTICE,"in the dictFindParity, inter dicthashkey");
     h = dictHashKey(d, cnt);
-    //serverLog(LL_NOTICE,"in the dictFindParity, h = %d", h);
+    serverLog(LL_NOTICE,"in the dictFindParity, h = %d", h);
 
     for (table = 0; table <= 1; table++) {
         idx = h & d->ht[table].sizemask;
-        //serverLog(LL_NOTICE,"in the dictFindParity, idx = %d", idx);
+        serverLog(LL_NOTICE,"in the dictFindParity, idx = %d", idx);
         he = d->ht[table].table[idx];
         if(he == NULL){
-            //serverLog(LL_NOTICE,"in the dictFindParity, he is NULL");
+            serverLog(LL_NOTICE,"in the dictFindParity, he is NULL");
         }else{
-            //serverLog(LL_NOTICE,"in the dictFindParity, before the while(he), the he->stat_set_commands is %s", (char *)he->stat_set_commands);
+            serverLog(LL_NOTICE,"in the dictFindParity, before the while(he), the he->stat_set_commands is %s", (char *)he->stat_set_commands);
         }        
         while(he) {
-            //serverLog(LL_NOTICE,"in the dictFindParity, the cnt is %s", (char *)cnt);
-            //serverLog(LL_NOTICE,"in the dictFindParity, the he->stat_set_commands is %s", (char *)he->stat_set_commands);
+            serverLog(LL_NOTICE,"in the dictFindParity, the cnt is %s", (char *)cnt);
+            serverLog(LL_NOTICE,"in the dictFindParity, the he->stat_set_commands is %s", (char *)he->stat_set_commands);
             if (cnt==he->stat_set_commands || dictCompareKeys(d, cnt, he->stat_set_commands)){
-                //serverLog(LL_NOTICE,"in the dictFindParity and while(he), find the he");
+                serverLog(LL_NOTICE,"in the dictFindParity and while(he), find the he");
                 return he;
             }  
-            //serverLog(LL_NOTICE,"in the dictFindParity and while(he), didn't find the he");
+            serverLog(LL_NOTICE,"in the dictFindParity and while(he), didn't find the he");
             he = he->next;
         }
         if (!dictIsRehashing(d)) return NULL;

@@ -1366,10 +1366,8 @@ void processInputBuffer(client *c) {
         }
 
         if (c->reqtype == PROTO_REQ_INLINE) {
-            //serverLog(LL_NOTICE,"processInlineBuffer");
             if (processInlineBuffer(c) != C_OK) break;
         } else if (c->reqtype == PROTO_REQ_MULTIBULK) {
-            //serverLog(LL_NOTICE,"processMultibulkBuffer");
             if (processMultibulkBuffer(c) != C_OK) break;
         } else {
             serverPanic("Unknown request type");
@@ -1393,7 +1391,6 @@ void processInputBuffer(client *c) {
                     serverLog(LL_NOTICE,"in the dictIterator of server.db->dict, Entry->key: %s", (char *)de->key);
                     serverLog(LL_NOTICE,"in the dictIterator of server.db->dict, Entry->val: %s", (char *)de->v.val);
                 }
-
                 parity_flag = 1;
             }
             else{
@@ -1451,6 +1448,7 @@ void processInputBuffer(client *c) {
                 serverLog(LL_NOTICE,"in the PARITY_READ_BUFFER_AND_ENCODE, and the server.testStr is %s", server.testStr);
                 
                 insertKeyCntDict(c);//更新key和cnt的hash表
+                serverLog(LL_NOTICE, "before insertCntKeyDict");
                 int keyFlag = insertCntKeyDict(c);//更新cnt和key的hash表
                 serverLog(LL_NOTICE, "the keyFlag is %d", keyFlag);
 
@@ -1458,7 +1456,9 @@ void processInputBuffer(client *c) {
                     serverLog(LL_NOTICE,"Process Encode error in processEncodeCommand");
                 }
                 else{
-                    tmp = dictFindParity(server.parityDict,c->argv[3]->ptr);
+                    serverLog(LL_NOTICE,"Process Encode OK in processEncodeCommand");
+                    tmp = dictFindParity(server.parityDict, c->argv[3]->ptr);
+                    serverLog(LL_NOTICE,"dictFindParity OK after processEncodeCommand");
                     if(tmp!=NULL){
                         serverLog(LL_NOTICE,"processEncodeCommand is OK, and the Entry:");
                         serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmp->stat_set_commands);
