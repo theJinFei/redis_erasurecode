@@ -118,9 +118,9 @@ void setGenericCommand(client *c, int flags, robj *key, robj *val, robj *expire,
     if(temp != NULL){
 
         if(temp->encoding == OBJ_ENCODING_INT){   
-            serverLog(LL_NOTICE, "the temp = %d", (long)temp->ptr);
-            serverLog(LL_NOTICE, "the error is the result of INT");
-            serverLog(LL_NOTICE, "temp->encoding == OBJ_ENCODING_INT");
+            // serverLog(LL_NOTICE, "the temp = %d", (long)temp->ptr);
+            // serverLog(LL_NOTICE, "the error is the result of INT");
+            // serverLog(LL_NOTICE, "temp->encoding == OBJ_ENCODING_INT");
         }
         
         int lenNew = strlen((char*)val -> ptr);//新value
@@ -132,8 +132,8 @@ void setGenericCommand(client *c, int flags, robj *key, robj *val, robj *expire,
         strcpy(newValue,(char*)val -> ptr);
         strcpy(oldValue,(char*)temp -> ptr);
 
-        serverLog(LL_NOTICE, "the newValue is %s", newValue);
-        serverLog(LL_NOTICE, "the oldValue is %s", oldValue);
+        // serverLog(LL_NOTICE, "the newValue is %s", newValue);
+        // serverLog(LL_NOTICE, "the oldValue is %s", oldValue);
 
         int lentmp = (lenNew>lenOld)?lenNew:lenOld;
         char *tmpValue = (char *)malloc(lentmp*sizeof(char));
@@ -146,9 +146,9 @@ void setGenericCommand(client *c, int flags, robj *key, robj *val, robj *expire,
             tmpValue[i] ^= oldValue[i];
         }
 
-        serverLog(LL_NOTICE, "the tmpValue after XOR is %s", tmpValue);
+        // serverLog(LL_NOTICE, "the tmpValue after XOR is %s", tmpValue);
         for(int i=0;i<lentmp;i++){
-            serverLog(LL_NOTICE, "the NO.%d tmpValue after XOR is %d", i, (int)tmpValue[i]);
+            // serverLog(LL_NOTICE, "the NO.%d tmpValue after XOR is %d", i, (int)tmpValue[i]);
         }
 
         //feedParityXOR(c, tmpValue);

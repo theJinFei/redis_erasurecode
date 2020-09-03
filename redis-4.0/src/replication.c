@@ -343,12 +343,12 @@ void feedParityARGV(client *cl, const int argc, robj** argv){
 
             // cnt
             dictEntry *entry = dictFind(cl->db->dict, argv[1]->ptr);
-            serverLog(LL_NOTICE, "in the feedParityARGV, the entry->stat_set_commands = %d", *(int *)entry->stat_set_commands);
+            //serverLog(LL_NOTICE, "in the feedParityARGV, the entry->stat_set_commands = %d", *(int *)entry->stat_set_commands);
             ll2string(buf,32, *(int *)entry->stat_set_commands);
             strcat(sendStr,buf);
             strcat(sendStr," ");
 
-            serverLog(LL_NOTICE, "before sendStr = %s, the argc is %d",sendStr, argc);
+            //serverLog(LL_NOTICE, "before sendStr = %s, the argc is %d",sendStr, argc);
 
             // 最后一个 解析 value
             if(argv[argc - 1]->encoding == OBJ_ENCODING_INT){
@@ -392,16 +392,16 @@ void feedParityARGV(client *cl, const int argc, robj** argv){
                 strcat(sendStr,(char*)(argv[argc - 1]->ptr));
             }
 
-            serverLog(LL_NOTICE, "in the feedParityARGV, the sendStr = %s",sendStr);
+            //serverLog(LL_NOTICE, "in the feedParityARGV, the sendStr = %s",sendStr);
 
             // set key flag cnt len value
             redisAppendCommand(c,sendStr);
 
-            serverLog(LL_NOTICE, "sendStr = %s",sendStr);
+            //serverLog(LL_NOTICE, "sendStr = %s",sendStr);
 
             /*获取set命令结果*/
             redisGetReply(c,&reply); // reply for SET
-            serverLog(LL_NOTICE, "in the feedParityARGV, the reply is %s", reply -> str);
+            //serverLog(LL_NOTICE, "in the feedParityARGV, the reply is %s", reply -> str);
             freeReplyObject(reply);
             redisFree(c);
         }
@@ -416,11 +416,11 @@ void feedParityXOR(client* cl, const char* parityXOR)
     const char* parityip = "127.0.0.1";
     const uint16_t port = 7002;
      // 保证这个只执行一遍
-    serverLog(LL_NOTICE, "the server.port is %d and the port is %d", server.port, port);
+    //serverLog(LL_NOTICE, "the server.port is %d and the port is %d", server.port, port);
     if(server.port != port && !(server.cluster -> myself -> flags & CLUSTER_NODE_SLAVE)){ 
-        serverLog(LL_NOTICE, "the flags is  %d and the CLUSTER_NODE_SLAVE is %d", server.cluster -> myself -> flags, CLUSTER_NODE_SLAVE);
+        //serverLog(LL_NOTICE, "the flags is  %d and the CLUSTER_NODE_SLAVE is %d", server.cluster -> myself -> flags, CLUSTER_NODE_SLAVE);
         
-        serverLog(LL_NOTICE, "after feedParityXOR, the hostip is %s, the server.port is %d and the port is %d", server.bindaddr, server.port, port);
+        //serverLog(LL_NOTICE, "after feedParityXOR, the hostip is %s, the server.port is %d and the port is %d", server.bindaddr, server.port, port);
         redisContext *c = redisConnect(parityip, port);
         if (c == NULL || c->err) {
             if (c) {
@@ -458,7 +458,7 @@ void feedParityXOR(client* cl, const char* parityXOR)
         //ll2string(buf,32,server.stat_numsetcommands);
 
         dictEntry *entry = dictFind(cl->db->dict, cl->argv[1]->ptr);
-        serverLog(LL_NOTICE, "in the feedParityXOR, the entry->stat_set_commands = %d", *(int *)entry->stat_set_commands);
+        //serverLog(LL_NOTICE, "in the feedParityXOR, the entry->stat_set_commands = %d", *(int *)entry->stat_set_commands);
 
         //buf = (char *)entry->stat_set_commands;
         sprintf(buf, "%d", *(int *)entry->stat_set_commands);
@@ -466,16 +466,16 @@ void feedParityXOR(client* cl, const char* parityXOR)
 
         redisAppendCommand(c,sendStr);
 
-        serverLog(LL_NOTICE, "after feedParityXOR, the server.stat_numsetcommands = %d", server.stat_numsetcommands);
+        //serverLog(LL_NOTICE, "after feedParityXOR, the server.stat_numsetcommands = %d", server.stat_numsetcommands);
 
         // 这个有问题 非字符 不识别？
-        serverLog(LL_NOTICE, "sendStr = %s", sendStr);
+        //serverLog(LL_NOTICE, "sendStr = %s", sendStr);
 
         /*添加命令get */
         // redisAppendCommand(c,"GET foo2");
         /*获取set命令结果*/
         redisGetReply(c,&reply); // reply for SET
-        serverLog(LL_NOTICE, "in the feedParityXOR, the reply is %s", reply -> str);
+        //serverLog(LL_NOTICE, "in the feedParityXOR, the reply is %s", reply -> str);
         freeReplyObject(reply);
         redisFree(c);
         // serverLog(LL_NOTICE, "the message has already sended .... ");
@@ -490,11 +490,11 @@ void feedParityXORLen(client *cl, const char* key, const char* parityXOR, int le
     for(port = 7002; port <= 7003; port++){
     
         // 保证这个只执行一遍
-        serverLog(LL_NOTICE, "the server.port is %d and the port is %d", server.port, port);
+        //serverLog(LL_NOTICE, "the server.port is %d and the port is %d", server.port, port);
         if(server.port != port && !(server.cluster -> myself -> flags & CLUSTER_NODE_SLAVE)){ 
-            serverLog(LL_NOTICE, "the flags is  %d and the CLUSTER_NODE_SLAVE is %d", server.cluster -> myself -> flags, CLUSTER_NODE_SLAVE);
+            //serverLog(LL_NOTICE, "the flags is  %d and the CLUSTER_NODE_SLAVE is %d", server.cluster -> myself -> flags, CLUSTER_NODE_SLAVE);
             
-            serverLog(LL_NOTICE, "after feedParityXORLen, the hostip is %s, the server.port is %d and the port is %d", server.bindaddr, server.port, port);
+            //serverLog(LL_NOTICE, "after feedParityXORLen, the hostip is %s, the server.port is %d and the port is %d", server.bindaddr, server.port, port);
             redisContext *c = redisConnect(parityip, port);
             if (c == NULL || c->err) {
                 if (c) {
@@ -543,7 +543,7 @@ void feedParityXORLen(client *cl, const char* key, const char* parityXOR, int le
             
             // cnt
             dictEntry *entry = dictFind(cl->db->dict, cl->argv[1]->ptr);
-            serverLog(LL_NOTICE, "in the feedParityXORLen, the entry->stat_set_commands = %d", *(int *)entry->stat_set_commands);
+            //serverLog(LL_NOTICE, "in the feedParityXORLen, the entry->stat_set_commands = %d", *(int *)entry->stat_set_commands);
             memset(flag, 0, sizeof(char) * 32);
             ll2string(flag, 32, *(int *)entry->stat_set_commands);
             sendStr = sdscatfmt(sendStr, "$%u\r\n", strlen(flag));
@@ -565,15 +565,15 @@ void feedParityXORLen(client *cl, const char* key, const char* parityXOR, int le
             sendStr = sdscatlen(sendStr, "\r\n", sizeof("\r\n")-1);
             
             int afterlen = sdslen(sendStr);
-            serverLog(LL_NOTICE, "the len diff is %d", afterlen - beforelen);
-            serverLog(LL_NOTICE, "the sensStr is %s", sendStr);
+            //serverLog(LL_NOTICE, "the len diff is %d", afterlen - beforelen);
+            //serverLog(LL_NOTICE, "the sensStr is %s", sendStr);
             __redisAppendCommand(c, sendStr, afterlen);
 
-            serverLog(LL_NOTICE, "the c -> obuf is %s", c -> obuf);
+            //serverLog(LL_NOTICE, "the c -> obuf is %s", c -> obuf);
 
             /*获取set命令结果*/
             redisGetReply(c,&reply); // reply for SET
-            serverLog(LL_NOTICE, "in the feedParityXORLen, the reply is %s", reply -> str);
+            //serverLog(LL_NOTICE, "in the feedParityXORLen, the reply is %s", reply -> str);
             freeReplyObject(reply);
             redisFree(c);
         }

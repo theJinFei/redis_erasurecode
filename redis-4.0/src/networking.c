@@ -1380,21 +1380,21 @@ void processInputBuffer(client *c) {
 
         if(strcmp((char *)(c -> argv[0] -> ptr), "recovery") == 0){
             if(processRecoveryAll(c) == C_OK){
-                serverLog(LL_NOTICE,"processRecoveryAll is OK");
+                // serverLog(LL_NOTICE,"processRecoveryAll is OK");
 
                 dictIterator *di;
                 dictEntry *de;
 
                 di = dictGetSafeIterator(server.db->dict);
                 while((de = dictNext(di)) != NULL) {
-                    serverLog(LL_NOTICE,"in the dictIterator of server.db->dict, Entry->cnt: %s", (char *)de->stat_set_commands);
-                    serverLog(LL_NOTICE,"in the dictIterator of server.db->dict, Entry->key: %s", (char *)de->key);
-                    serverLog(LL_NOTICE,"in the dictIterator of server.db->dict, Entry->val: %s", (char *)de->v.val);
+                    // serverLog(LL_NOTICE,"in the dictIterator of server.db->dict, Entry->cnt: %s", (char *)de->stat_set_commands);
+                    // serverLog(LL_NOTICE,"in the dictIterator of server.db->dict, Entry->key: %s", (char *)de->key);
+                    // serverLog(LL_NOTICE,"in the dictIterator of server.db->dict, Entry->val: %s", (char *)de->v.val);
                 }
                 parity_flag = 1;
             }
             else{
-                serverLog(LL_NOTICE,"Error: processRecoveryAll is error");
+                // serverLog(LL_NOTICE,"Error: processRecoveryAll is error");
             }
 
         }
@@ -1413,24 +1413,24 @@ void processInputBuffer(client *c) {
             // set key flag cnt len pairtyXOR
             for(int i = 0; i < c -> argc; i++){
                 robj* o = getDecodedObject(c -> argv[i]);
-                serverLog(LL_NOTICE,"before the switch-case, o -> ptr is %s", (char *)(o -> ptr));
+                // serverLog(LL_NOTICE,"before the switch-case, o -> ptr is %s", (char *)(o -> ptr));
             }
             
             // key
             char *s = (char *)(getDecodedObject(c -> argv[1]) -> ptr);
-            serverLog(LL_NOTICE,"the s is %s", s);
+            // serverLog(LL_NOTICE,"the s is %s", s);
 
             // flag
             char* e = (char *)(getDecodedObject(c -> argv[2]) -> ptr);
-            serverLog(LL_NOTICE,"the e is %s", e);
+            // serverLog(LL_NOTICE,"the e is %s", e);
 
             // parityXOR_DIFF
             char* diff = (char *)(getDecodedObject(c -> argv[5]) -> ptr); 
-            serverLog(LL_NOTICE,"the diff is %s",diff);
+            // serverLog(LL_NOTICE,"the diff is %s",diff);
 
             // 找到长度
             char* diffLen = (char*)(getDecodedObject(c -> argv[4]) -> ptr);
-            serverLog(LL_NOTICE,"the diffLen is %d", atoi(diffLen));
+            // serverLog(LL_NOTICE,"the diffLen is %d", atoi(diffLen));
 
             dictEntry *tmp = NULL;
 
@@ -1441,36 +1441,36 @@ void processInputBuffer(client *c) {
                 break;
 
             case PARITY_READ_BUFFER_AND_ENCODE: 
-                serverLog(LL_NOTICE,"this is networking's PARITY_READ_BUFFER_AND_ENCODE, and the flag is %d", e[0] - '0');
+                // serverLog(LL_NOTICE,"this is networking's PARITY_READ_BUFFER_AND_ENCODE, and the flag is %d", e[0] - '0');
                 
                 server.testStr=(char*)(c -> argv[5] -> ptr);
                 server.testStrLen = atoi((char*)(getDecodedObject(c -> argv[4]) -> ptr));
-                serverLog(LL_NOTICE,"in the PARITY_READ_BUFFER_AND_ENCODE, and the server.testStr is %s", server.testStr);
+                // serverLog(LL_NOTICE,"in the PARITY_READ_BUFFER_AND_ENCODE, and the server.testStr is %s", server.testStr);
                 
                 insertKeyCntDict(c);//更新key和cnt的hash表
-                serverLog(LL_NOTICE, "before insertCntKeyDict");
+                // serverLog(LL_NOTICE, "before insertCntKeyDict");
                 int keyFlag = insertCntKeyDict(c);//更新cnt和key的hash表
-                serverLog(LL_NOTICE, "the keyFlag is %d", keyFlag);
+                // serverLog(LL_NOTICE, "the keyFlag is %d", keyFlag);
 
                 if (processEncodeCommand(c, keyFlag) != C_OK){
-                    serverLog(LL_NOTICE,"Process Encode error in processEncodeCommand");
+                    // serverLog(LL_NOTICE,"Process Encode error in processEncodeCommand");
                 }
                 else{
-                    serverLog(LL_NOTICE,"Process Encode OK in processEncodeCommand");
+                    // serverLog(LL_NOTICE,"Process Encode OK in processEncodeCommand");
                     tmp = dictFindParity(server.parityDict, c->argv[3]->ptr);
-                    serverLog(LL_NOTICE,"dictFindParity OK after processEncodeCommand");
+                    // serverLog(LL_NOTICE,"dictFindParity OK after processEncodeCommand");
                     if(tmp!=NULL){
-                        serverLog(LL_NOTICE,"processEncodeCommand is OK, and the Entry:");
-                        serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmp->stat_set_commands);
-                        serverLog(LL_NOTICE,"Entry->key: %s", (char*)tmp->key);
-                        serverLog(LL_NOTICE,"Entry->val: %s", (char*)tmp->v.val);
-                        serverLog(LL_NOTICE,"Entry->val_len: %d", *(int*)tmp->val_len);
+                        // serverLog(LL_NOTICE,"processEncodeCommand is OK, and the Entry:");
+                        // serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmp->stat_set_commands);
+                        // serverLog(LL_NOTICE,"Entry->key: %s", (char*)tmp->key);
+                        // serverLog(LL_NOTICE,"Entry->val: %s", (char*)tmp->v.val);
+                        // serverLog(LL_NOTICE,"Entry->val_len: %d", *(int*)tmp->val_len);
 
                         addReplyBulk(c,c->argv[5]); 
                         parity_flag = 1;
                     }
                     else{
-                        serverLog(LL_NOTICE,"The entry is empty");
+                        // serverLog(LL_NOTICE,"The entry is empty");
                     }   
                 }
                 break;
@@ -1478,45 +1478,45 @@ void processInputBuffer(client *c) {
             case PARITY_READ_BUFFER_AND_UPDATE: 
             {
                 if (processUpdateParityCommand(c) != C_OK){
-                    serverLog(LL_NOTICE,"Process Update Parity error in processInputBuffer");
+                    // serverLog(LL_NOTICE,"Process Update Parity error in processInputBuffer");
                 }
                 else{
                     tmp = dictFindParity(server.parityDict,c->argv[3]->ptr);
                     if(tmp!=NULL){
-                        serverLog(LL_NOTICE,"processUpdateParityCommand is OK, and the Entry:");
-                        serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmp->stat_set_commands);
-                        serverLog(LL_NOTICE,"Entry->key: %s", (char*)tmp->key);
-                        serverLog(LL_NOTICE,"Entry->val: %s", (char*)tmp->v.val);
-                        serverLog(LL_NOTICE,"Entry->val_len: %d", *(int*)tmp->val_len);
+                        // serverLog(LL_NOTICE,"processUpdateParityCommand is OK, and the Entry:");
+                        // serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmp->stat_set_commands);
+                        // serverLog(LL_NOTICE,"Entry->key: %s", (char*)tmp->key);
+                        // serverLog(LL_NOTICE,"Entry->val: %s", (char*)tmp->v.val);
+                        // serverLog(LL_NOTICE,"Entry->val_len: %d", *(int*)tmp->val_len);
                         addReplyBulk(c,c->argv[5]);   
                         parity_flag = 1;
                     }
                     else{
-                        serverLog(LL_NOTICE,"The entry is empty");
+                        // serverLog(LL_NOTICE,"The entry is empty");
                     }       
                 }
                 break;
             }
 
             case PARITY_NOTIFY_DATANODE: 
-                serverLog(LL_NOTICE,"in the PARITY_NOTIFY_DATANODE");
+                // serverLog(LL_NOTICE,"in the PARITY_NOTIFY_DATANODE");
 
                 if(processReplyGet(c)!=C_OK){
-                    serverLog(LL_NOTICE,"processStartReGet is Error");
+                    // serverLog(LL_NOTICE,"processStartReGet is Error");
                 }
                 else{
-                    serverLog(LL_NOTICE,"need to send the result to client");
+                    // serverLog(LL_NOTICE,"need to send the result to client");
                     parity_flag = 1;
                 }
                 break;
 
             case PARIYT_DATANODE_TRANSFORM_VALUE:
-                serverLog(LL_NOTICE,"in the PARIYT_DATANODE_TRANSFORM_VALUE");
+                // serverLog(LL_NOTICE,"in the PARIYT_DATANODE_TRANSFORM_VALUE");
 
                 tmp = dictFind(server.db->dict, c->argv[1]->ptr);
                 robj *val = dictGetVal(tmp);
                 addReplyBulkCString(c, (char *)(getDecodedObject(val) -> ptr));
-                serverLog(LL_NOTICE,"the 7001.value is %s", (char *)(getDecodedObject(val) -> ptr));
+                // serverLog(LL_NOTICE,"the 7001.value is %s", (char *)(getDecodedObject(val) -> ptr));
 
                 parity_flag = 1;
                 break;
