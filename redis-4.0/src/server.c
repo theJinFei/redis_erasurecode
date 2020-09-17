@@ -1916,6 +1916,7 @@ void initServer(void) {
     server.parityDict = dictCreate(&dbDictType, NULL);
     server.KeyCntDict = dictCreate(&dbDictType, NULL);
     server.CntKeyDict = dictCreate(&dbDictType, NULL);
+    // server.totalSec = 0.0;
 
     int k=3, m=2, w=8;
     server.matrix = reed_sol_vandermonde_coding_matrix(k, m, w);
@@ -2652,14 +2653,14 @@ void insertKeyCntDict(client* c)
 
         dictEntry *tmp = dictFind(server.KeyCntDict,c->argv[1]->ptr);
         if(tmp!=NULL){
-            //serverLog(LL_NOTICE,"the insertKeyCntDict successfully ...");
-            //serverLog(LL_NOTICE,"Entry->key: %s", (char*)tmp->key);
-            //serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmp->stat_set_commands);  
+            serverLog(LL_NOTICE,"the insertKeyCntDict successfully ...");
+            serverLog(LL_NOTICE,"Entry->key: %s", (char*)tmp->key);
+            serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmp->stat_set_commands);  
         }
     
     } else {
         //已经有过的key
-        //serverLog(LL_NOTICE,"KeyCntDict isn't NULL and return");
+        serverLog(LL_NOTICE,"KeyCntDict isn't NULL and return");
     }
 }
 
@@ -2683,19 +2684,19 @@ int insertCntKeyDict(client* c){
         return 2;
     }
     else{
-        //serverLog(LL_NOTICE, "the client port is error");
+        serverLog(LL_NOTICE, "the client port is error");
         return 3;
     }
 }
 
 // 将收到的消息写入校验节点 应该把key value插入到hash表中
 int processEncodeCommand(client *c, int keyFlag){
-    //serverLog(LL_NOTICE,"in the processEncodeCommand");
-    int j;
-    for(j = 0; j < c -> argc; j++){
-        robj* o = c -> argv[j];
-        //serverLog(LL_NOTICE,"int the processEncodeCommand, the obj is %s", (char*)(o -> ptr));
-    }
+    serverLog(LL_NOTICE,"in the processEncodeCommand");
+    // int j;
+    // for(j = 0; j < c -> argc; j++){
+    //     robj* o = c -> argv[j];
+    //     //serverLog(LL_NOTICE,"int the processEncodeCommand, the obj is %s", (char*)(o -> ptr));
+    // }
 
     //db = c->db;
     //dict = c->db->dict;
@@ -2708,10 +2709,11 @@ int processEncodeCommand(client *c, int keyFlag){
     int * tmpCnt = (int *)malloc(strlen((char *)c->argv[5]->ptr)*sizeof(int));
     * tmpCnt = strlen((char *)c->argv[5]->ptr);
     //serverLog(LL_NOTICE, "in the processEncodeCommand, the val_len = %d", *tmpCnt);
+    //free(tmpCnt);
 
     if (dictFindParity(server.parityDict,c->argv[3]->ptr) == NULL) {
         //全新的cnt，向hash表中插入key,val,cnt
-        //serverLog(LL_NOTICE,"dictFindParity is NULL and dbAddParity");
+        serverLog(LL_NOTICE,"in the dbAddParity");
 
         sds copy = sdsdup(c->argv[3]->ptr);
         if(erasure_encode_firstkey(server.parityDict, copy, c->argv[5]->ptr, keyFlag) != C_OK){
@@ -2720,7 +2722,7 @@ int processEncodeCommand(client *c, int keyFlag){
     } else {
         //已经有过的cnt
         //另一个data node的同cnt命令，做校验后插入
-        //serverLog(LL_NOTICE,"dictFindParity isn't NULL and dbOverwriteParity");
+        serverLog(LL_NOTICE,"in the dbOverwriteParity");
 
         dictEntry *de = dictFindParity(server.parityDict,c->argv[3]->ptr);
         serverAssertWithInfo(NULL,c->argv[1],de != NULL);
@@ -2736,7 +2738,7 @@ int processEncodeCommand(client *c, int keyFlag){
 }
 
 int processUpdateParityCommand(client *c){
-    //serverLog(LL_NOTICE,"in the processUpdateParityCommand");
+    serverLog(LL_NOTICE,"in the processUpdateParityCommand");
     int j;
     for(j = 0; j < c -> argc; j++){
         robj* o = c -> argv[j];
@@ -2752,28 +2754,29 @@ int processUpdateParityCommand(client *c){
     //val = c->argv[5];
 
     if (dictFindParity(server.parityDict,c->argv[3]->ptr) == NULL) {
-        //serverLog(LL_NOTICE,"Error: int the UpdateParity, dictFindParity is NULL");
+        serverLog(LL_NOTICE,"Error: int the UpdateParity, dictFindParity is NULL");
         return C_ERR;
     } else {
         //已经有过的cnt
         //同一个data node的同cnt命令更新，做校验后插入
         //serverLog(LL_NOTICE,"dictFindParity isn't NULL and dbUpdateParity");
 
-        dictEntry *de = dictFindParity(server.parityDict,c->argv[3]->ptr);
-        serverAssertWithInfo(NULL,c->argv[1],de != NULL);
+        // dictEntry *de = dictFindParity(server.parityDict,c->argv[3]->ptr);
+        // serverAssertWithInfo(NULL,c->argv[1],de != NULL);
 
         int flag;
         dictEntry *keyEntry = dictFindParity(server.CntKeyDict, c->argv[3]->ptr);
 
         if(keyEntry == NULL){
-            //serverLog(LL_NOTICE, "before updateParity, the keyEntry is NULL");
+            serverLog(LL_NOTICE, "before updateParity, the keyEntry is NULL");
         }
         else{
-            //serverLog(LL_NOTICE, "before updateParity, the keyEntry isn't NULL");
-            //serverLog(LL_NOTICE, "keyEntry->key is %s", (char *)keyEntry->key);
-            //serverLog(LL_NOTICE, "keyEntry->v.val is %s", (char *)keyEntry->v.val);
-            //serverLog(LL_NOTICE, "keyEntry->val_len is %s", (char *)keyEntry->val_len);
-            //serverLog(LL_NOTICE, "c->argv[1]->ptr is %s", (char *)c->argv[1]->ptr);
+            serverLog(LL_NOTICE, "before updateParity, the keyEntry isn't NULL");
+            serverLog(LL_NOTICE, "keyEntry->cnt is %s", (char *)keyEntry->stat_set_commands);
+            serverLog(LL_NOTICE, "keyEntry->key1 is %s", (char *)keyEntry->key);
+            serverLog(LL_NOTICE, "keyEntry->key2 is %s", (char *)keyEntry->v.val);
+            serverLog(LL_NOTICE, "keyEntry->key3 is %s", (char *)keyEntry->val_len);
+            serverLog(LL_NOTICE, "c->argv[1]->ptr is %s", (char *)c->argv[1]->ptr);
         }
 
         if((keyEntry->key != NULL) && (strcmp((char *)keyEntry->key, (char *)c->argv[1]->ptr) == 0)){
@@ -2789,7 +2792,7 @@ int processUpdateParityCommand(client *c){
             //serverLog(LL_NOTICE, "before updateParity, the flag is %d", flag);
         }
         else{
-            //serverLog(LL_NOTICE, "didn't find the key in the server.CntKeyDict");
+            serverLog(LL_NOTICE, "didn't find the key in the server.CntKeyDict");
             return C_ERR;
         }
 
@@ -2861,8 +2864,11 @@ int processRecoverySignalData(client *c){
 
         redisContext *cl = redisConnect(parityip, port);
 
-        char *sendStr = (char *) malloc(sizeof(char)*100);
-        memset(sendStr,0,sizeof(char)*100);
+        // char *sendStr = (char *) malloc(sizeof(char)*100);
+        // memset(sendStr,0,sizeof(char)*100);
+        char *sendStr = (char *) malloc(sizeof(char)*(100 + valLen));
+        memset(sendStr,0,sizeof(char)*(100 + valLen));
+        serverLog(LL_NOTICE,"in the processRecoverySignalData, init sendStr");
         char buf[32];
 
         // set 
@@ -2924,6 +2930,7 @@ int processRecoverySignalData(client *c){
 
         freeReplyObject(reply);
         redisFree(cl);  
+        free(sendStr);
     }
 
     // 7001, data[1], tmpdata1
@@ -3042,6 +3049,20 @@ int processRecoverySignalData(client *c){
     addReplyBulkCString(c, recoveryData);
     free(recoveryData);
 
+    free(tmpdata1);
+    free(tmpdata4);
+    free(erasures);
+
+    for (i = 0; i < k; i++) {
+        free(data[i]);
+    }
+    free(data);
+
+    for (i = 0; i < m; i++) {
+        free(coding[i]); 
+    }
+    free(coding);
+
     return C_OK;
 }
 
@@ -3084,8 +3105,11 @@ int processRecoveryAll(client *c){
 
             redisContext *cl = redisConnect(parityip, port);
 
-            char *sendStr = (char *) malloc(sizeof(char)*100);
-            memset(sendStr,0,sizeof(char)*100);
+            // char *sendStr = (char *) malloc(sizeof(char)*100);
+            // memset(sendStr,0,sizeof(char)*100);
+            char *sendStr = (char *) malloc(sizeof(char)*(100 + valLen));
+            memset(sendStr,0,sizeof(char)*(100 + valLen));
+            serverLog(LL_NOTICE,"in the processRecoveryAll, init sendStr");
             char buf[32];
 
             // set 
@@ -3139,9 +3163,12 @@ int processRecoveryAll(client *c){
 
             freeReplyObject(reply);
             redisFree(cl);
+            free(sendStr);
         }
 
         dbRecovery(server.db, de, (char *)tmpKey->key, tmpdata1, tmpdata4);
+        free(tmpdata1);
+        free(tmpdata4);
     }
     dictReleaseIterator(di);
 
@@ -3158,6 +3185,7 @@ int processRecoveryAll(client *c){
     //serverLog(LL_NOTICE,"before reply 7001, the replyStr is %s", replyStr);
 
     addReplyBulkCString(c,replyStr);
+    free(replyStr);
 
     return C_OK;
 }
@@ -3183,8 +3211,6 @@ int erasure_encode_firstkey(dict *d, void *cnt, void *val, int keyFlag){
     }
 
     int len = strlen((char *)val);
-    //serverLog(LL_NOTICE,"the val is %s", (char *)val);
-    //serverLog(LL_NOTICE,"the len of val is %d", len);
     
     if(len <= 4){
         tmpval_1 = talloc(char, sizeof(int));
@@ -3231,7 +3257,6 @@ int erasure_encode_firstkey(dict *d, void *cnt, void *val, int keyFlag){
         // serverLog(LL_NOTICE, "data[2]:   %02x %02x %02x %02x", (unsigned char)data[2][0], (unsigned char)data[2][1], (unsigned char)data[2][2], (unsigned char)data[2][3]);
         // serverLog(LL_NOTICE, "coding[0]: %02x %02x %02x %02x", (unsigned char)coding[0][0], (unsigned char)coding[0][1], (unsigned char)coding[0][2], (unsigned char)coding[0][3]);
         // serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
-
     }
 
     else{
@@ -3298,19 +3323,34 @@ int erasure_encode_firstkey(dict *d, void *cnt, void *val, int keyFlag){
         //      (unsigned char)tmpval_1[count], (unsigned char)tmpval_1[count+1], 
         //      (unsigned char)tmpval_1[count+2], (unsigned char)tmpval_1[count+3]);
         // }
+        
+        for (i = 0; i < time; i++) {
+            free(tmpval[i]); 
+        }
+        free(tmpval);
     }
-    //serverLog(LL_NOTICE, "test1");
-    int * tmpCnt = (int *)malloc(strlen(tmpval_1)*sizeof(int));
-    //serverLog(LL_NOTICE, "test2");
-    * tmpCnt = strlen(tmpval_1);
-    //serverLog(LL_NOTICE, "test3");
-    dictAddParity(d, cnt, NULL, tmpval_1, tmpCnt);
-    //serverLog(LL_NOTICE, "test4");
+
+
+    int tmpCnt = strlen(tmpval_1);
+    serverLog(LL_NOTICE,"before dictAddParity, the cnt = %d, val = %s", tmpCnt, tmpval_1);
+    dictAddParity(d, cnt, NULL, tmpval_1, &tmpCnt);
+    
+    for (i = 0; i < k; i++) {
+        free(data[i]);
+    }
+    free(data);
+
+    for (i = 0; i < m; i++) {
+        free(coding[i]); 
+    }
+    free(coding);
+    free(tmpval_1);
 
     return C_OK;
 }
 
 int erasure_encode_anotherkey(dict *d, void *cnt, void *val, void *val_len, int keyFlag){
+    serverLog(LL_NOTICE,"in the erasure_encode_anotherkey");
     dictEntry *codeEntry = dictFindParity(server.parityDict, cnt);
 
     // serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)codeEntry->stat_set_commands);
@@ -3332,6 +3372,7 @@ int erasure_encode_anotherkey(dict *d, void *cnt, void *val, void *val_len, int 
     char *tmpval_1;
     char **tmpval;
 
+
     data = talloc(char *, k);
     for (i = 0; i < k; i++) {
         data[i] = talloc(char, sizeof(int));//4字节
@@ -3343,10 +3384,6 @@ int erasure_encode_anotherkey(dict *d, void *cnt, void *val, void *val_len, int 
         coding[i] = talloc(char, sizeof(int));
         memset(coding[i],0,sizeof(int)); 
     }
-
-    //int len = strlen((char *)val);
-    //serverLog(LL_NOTICE,"the val is %s", (char *)val);
-    //serverLog(LL_NOTICE,"the len of val is %d", len);
     
     if(len <= 4){
         tmpval_1 = talloc(char, sizeof(int));
@@ -3391,7 +3428,6 @@ int erasure_encode_anotherkey(dict *d, void *cnt, void *val, void *val_len, int 
         // serverLog(LL_NOTICE, "data[2]:   %02x %02x %02x %02x", (unsigned char)data[2][0], (unsigned char)data[2][1], (unsigned char)data[2][2], (unsigned char)data[2][3]);
         // serverLog(LL_NOTICE, "coding[0]: %02x %02x %02x %02x", (unsigned char)coding[0][0], (unsigned char)coding[0][1], (unsigned char)coding[0][2], (unsigned char)coding[0][3]);
         // serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
-
     }
 
     else{
@@ -3451,18 +3487,21 @@ int erasure_encode_anotherkey(dict *d, void *cnt, void *val, void *val_len, int 
             //serverLog(LL_NOTICE, "final coding[0]: %02x %02x %02x %02x", (unsigned char)tmpval[0], (unsigned char)tmpval[1], (unsigned char)tmpval[2], (unsigned char)tmpval[3]);
         }
 
-        // for(int count = 0; count < sizeof(int)*time; count+=4){
-        //     serverLog(LL_NOTICE, "final coding result: %02x %02x %02x %02x",
-        //      (unsigned char)tmpval_1[count], (unsigned char)tmpval_1[count+1], 
-        //      (unsigned char)tmpval_1[count+2], (unsigned char)tmpval_1[count+3]);
-        // }
-
+        for(int count = 0; count < sizeof(int)*time; count+=4){
+            serverLog(LL_NOTICE, "final coding result: %02x %02x %02x %02x",
+             (unsigned char)tmpval_1[count], (unsigned char)tmpval_1[count+1], 
+             (unsigned char)tmpval_1[count+2], (unsigned char)tmpval_1[count+3]);
+        }
+        for (i = 0; i < time; i++) {
+            free(tmpval[i]); 
+        }
+        free(tmpval);
     }
 
     // 校验Value
     int lenValOld = *(int*)codeEntry->val_len;
     int lenValNew = len;
-    //serverLog(LL_NOTICE,"the lenValOld = %d, the lenValNew = %d", lenValOld, lenValNew);
+    serverLog(LL_NOTICE,"the lenValOld = %d, the lenValNew = %d", lenValOld, lenValNew);
 
     int lenvaltmp = (lenValOld>lenValNew)?lenValOld:lenValNew;
 
@@ -3476,7 +3515,7 @@ int erasure_encode_anotherkey(dict *d, void *cnt, void *val, void *val_len, int 
         tmpValue[i] ^= tmpval_1[i];
     }
 
-    //serverLog(LL_NOTICE,"before Set Parity Val, the tmpValue is %s",tmpValue);
+    serverLog(LL_NOTICE,"before Set Parity Val, the tmpValue is %s",tmpValue);
     // 设置新的val
     dictSetVal(d, codeEntry, tmpValue);
     //serverLog(LL_NOTICE,"after Set Parity Val, the NewValue is %s",(char *)codeEntry->v.val);
@@ -3488,11 +3527,26 @@ int erasure_encode_anotherkey(dict *d, void *cnt, void *val, void *val_len, int 
     //}
 
     // 设置新的val_len
-    int tmpLen = (lenValOld>lenValNew)?lenValOld:lenValNew;
-    int * tmpValLen = (int *)malloc(tmpLen*sizeof(int));
-    * tmpValLen = tmpLen;
-    //serverLog(LL_NOTICE,"before dictSetLen, the val_len = %d", lenvaltmp);
-    dictSetLen(d, codeEntry, tmpValLen);
+    // int * tmpValLen = (int *)malloc(lenvaltmp*sizeof(int));
+    // memset(tmpValLen,0,lenvaltmp*sizeof(int));
+    // * tmpValLen = lenvaltmp;
+    // serverLog(LL_NOTICE,"before dictSetLen, the val_len/lenvaltmp = %d", lenvaltmp);
+    // serverLog(LL_NOTICE,"before dictSetLen, the val_len/tmpValLen = %d", *tmpValLen);
+    dictSetLen(d, codeEntry, &lenvaltmp);
+
+    free(tmpValue);
+    //free(tmpValLen);
+
+    for (i = 0; i < k; i++) {
+        free(data[i]);
+    }
+    free(data);
+
+    for (i = 0; i < m; i++) {
+        free(coding[i]); 
+    }
+    free(coding);
+    free(tmpval_1);
 
     return C_OK;
 }

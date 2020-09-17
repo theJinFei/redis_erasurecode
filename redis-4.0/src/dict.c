@@ -291,6 +291,7 @@ int dictAdd(dict *d, void *key, void *val)
         * tmpCnt = server.stat_numsetcommands;
         entry->stat_set_commands = tmpCnt;
         //serverLog(LL_NOTICE, "in the dictAdd, the entry->stat_set_commands = %d", *(int *)(entry->stat_set_commands));
+        //free(tmpCnt);
     }
 #endif
 
@@ -633,6 +634,7 @@ int dictReplaceParity(dict *d, void *cnt, void *key, void *val, void *len, int f
         dictSetKey(d, entry, tmpKey);
 
         // dictFreeKey(d, &auxentry);
+        free(tmpKey);
     }
 
 
@@ -681,6 +683,9 @@ int dictReplaceParity(dict *d, void *cnt, void *key, void *val, void *len, int f
     // dictFreeVal(d, &auxentry);
 
     //serverLog(LL_NOTICE,"in the dictReplaceParity and before return");
+    free(tmpValue);
+    free(tmpValLen);
+
     return 0;
 
 }

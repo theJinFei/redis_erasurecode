@@ -288,10 +288,94 @@ void replicationFeedSlaves(list *slaves, int dictid, robj **argv, int argc) {
 # include "./../deps/hiredis/hiredis.h"
 # include "./../deps/hiredis/read.h"
 void feedParityARGV(client *cl, const int argc, robj** argv){
-
-    // 这里是不是应该不写这里？应该写db.c 插入到数据库之后，应该计算差值，实现value增量更新。
     const char* parityip = "127.0.0.1";
     int port = 7002;
+
+    // 需要添加非set命令 如果那边解析到了
+    /*添加命令set */
+
+    // char *sendStr = (char *) malloc(sizeof(char)*100);
+    // memset(sendStr,0,sizeof(char)*100);
+
+    char *sendStr = (char *) malloc(sizeof(char)*(100 + strlen((char*)(argv[argc - 1]->ptr))));
+    memset(sendStr,0,sizeof(char)*(100 + strlen((char*)(argv[argc - 1]->ptr))));
+    //serverLog(LL_NOTICE,"in the feedParityARGV, init senStr");
+
+    for(int i = 0; i < argc - 1; i++){
+        if(argv[i]->encoding == OBJ_ENCODING_INT){
+            char buf[32];
+            ll2string(buf, 32, (long)argv[i]->ptr);
+
+            serverLog(LL_NOTICE, "int = %s", buf);
+            serverLog(LL_NOTICE, "argv[i]->encoding == OBJ_ENCODING_INT");
+            strcat(sendStr,buf);
+        }
+        else{
+            strcat(sendStr,(char*)(argv[i]->ptr));
+        }   
+        strcat(sendStr," ");
+    }
+    
+    // flag 
+    char buf[32];
+    ll2string(buf,32,(long)PARITY_READ_BUFFER_AND_ENCODE);
+    strcat(sendStr,buf);
+    strcat(sendStr," ");
+
+    memset(buf, 0, sizeof(char) * 32);
+
+    // cnt
+    dictEntry *entry = dictFind(cl->db->dict, argv[1]->ptr);
+    //serverLog(LL_NOTICE, "in the feedParityARGV, the entry->stat_set_commands = %d", *(int *)entry->stat_set_commands);
+    ll2string(buf,32, *(int *)entry->stat_set_commands);
+    strcat(sendStr,buf);
+    strcat(sendStr," ");
+
+    //serverLog(LL_NOTICE, "before sendStr = %s, the argc is %d",sendStr, argc);
+
+    // 最后一个 解析 value
+    if(argv[argc - 1]->encoding == OBJ_ENCODING_INT){
+        // char buf[32];
+        memset(buf, 0, sizeof(char) * 32);
+        ll2string(buf,32,(long)argv[argc - 1]->ptr);
+
+        // 长度
+        // char bufflen[32];
+        // memset(bufflen, 0, sizeof(char) * 32);
+        // ll2string(bufflen,32,strlen(buf));
+        // strcat(sendStr, bufflen);
+        // strcat(sendStr, " ");
+
+        int tmpPort = server.port;
+        char bufflen[32];
+        memset(bufflen, 0, sizeof(char) * 32);
+        ll2string(bufflen,32,tmpPort);
+        strcat(sendStr, bufflen);
+        strcat(sendStr, " ");
+
+
+        // 真正的内容
+        strcat(sendStr,buf);
+    }else{
+        
+        // 长度
+        // char bufflen[32];
+        // memset(bufflen, 0, sizeof(char) * 32);
+        // ll2string(bufflen,32,strlen((char*)(argv[argc - 1]->ptr)));
+        // strcat(sendStr, bufflen);
+        // strcat(sendStr, " ");
+
+        int tmpPort = server.port;
+        char bufflen[32];
+        memset(bufflen, 0, sizeof(char) * 32);
+        ll2string(bufflen,32,tmpPort);
+        strcat(sendStr, bufflen);
+        strcat(sendStr, " ");
+
+        strcat(sendStr,(char*)(argv[argc - 1]->ptr));
+    }
+
+    serverLog(LL_NOTICE, "in the feedParityARGV, the sendStr = %s",sendStr);
 
     for(port = 7002; port <= 7003; port++){
 
@@ -310,103 +394,25 @@ void feedParityARGV(client *cl, const int argc, robj** argv){
             }
         
             redisReply *reply = NULL;
-
-
-            // 需要添加非set命令 如果那边解析到了
-            /*添加命令set */
-
-            char *sendStr = (char *) malloc(sizeof(char)*100);
-            memset(sendStr,0,sizeof(char)*100);
-
-            for(int i = 0; i < argc - 1; i++){
-                if(argv[i]->encoding == OBJ_ENCODING_INT){
-                    char buf[32];
-                    ll2string(buf, 32, (long)argv[i]->ptr);
-
-                    serverLog(LL_NOTICE, "int = %s", buf);
-                    serverLog(LL_NOTICE, "argv[i]->encoding == OBJ_ENCODING_INT");
-                    strcat(sendStr,buf);
-                }
-                else{
-                    strcat(sendStr,(char*)(argv[i]->ptr));
-                }   
-                strcat(sendStr," ");
-            }
-            
-            // flag 
-            char buf[32];
-            ll2string(buf,32,(long)PARITY_READ_BUFFER_AND_ENCODE);
-            strcat(sendStr,buf);
-            strcat(sendStr," ");
-
-            memset(buf, 0, sizeof(char) * 32);
-
-            // cnt
-            dictEntry *entry = dictFind(cl->db->dict, argv[1]->ptr);
-            //serverLog(LL_NOTICE, "in the feedParityARGV, the entry->stat_set_commands = %d", *(int *)entry->stat_set_commands);
-            ll2string(buf,32, *(int *)entry->stat_set_commands);
-            strcat(sendStr,buf);
-            strcat(sendStr," ");
-
-            //serverLog(LL_NOTICE, "before sendStr = %s, the argc is %d",sendStr, argc);
-
-            // 最后一个 解析 value
-            if(argv[argc - 1]->encoding == OBJ_ENCODING_INT){
-                // char buf[32];
-                memset(buf, 0, sizeof(char) * 32);
-                ll2string(buf,32,(long)argv[argc - 1]->ptr);
-
-                // 长度
-                // char bufflen[32];
-                // memset(bufflen, 0, sizeof(char) * 32);
-                // ll2string(bufflen,32,strlen(buf));
-                // strcat(sendStr, bufflen);
-                // strcat(sendStr, " ");
-
-                int tmpPort = server.port;
-                char bufflen[32];
-                memset(bufflen, 0, sizeof(char) * 32);
-                ll2string(bufflen,32,tmpPort);
-                strcat(sendStr, bufflen);
-                strcat(sendStr, " ");
-
-
-                // 真正的内容
-                strcat(sendStr,buf);
-            }else{
-                
-                // 长度
-                // char bufflen[32];
-                // memset(bufflen, 0, sizeof(char) * 32);
-                // ll2string(bufflen,32,strlen((char*)(argv[argc - 1]->ptr)));
-                // strcat(sendStr, bufflen);
-                // strcat(sendStr, " ");
-
-                int tmpPort = server.port;
-                char bufflen[32];
-                memset(bufflen, 0, sizeof(char) * 32);
-                ll2string(bufflen,32,tmpPort);
-                strcat(sendStr, bufflen);
-                strcat(sendStr, " ");
-
-                strcat(sendStr,(char*)(argv[argc - 1]->ptr));
-            }
-
-            //serverLog(LL_NOTICE, "in the feedParityARGV, the sendStr = %s",sendStr);
-
-            // set key flag cnt len value
             redisAppendCommand(c,sendStr);
-
-            //serverLog(LL_NOTICE, "sendStr = %s",sendStr);
-
-            /*获取set命令结果*/
-            redisGetReply(c,&reply); // reply for SET
+            redisGetReply(c,&reply);
             //serverLog(LL_NOTICE, "in the feedParityARGV, the reply is %s", reply -> str);
-            freeReplyObject(reply);
+            
+            // serverLog(LL_NOTICE,"test1");
+            // robj *sendComand;
+            // serverLog(LL_NOTICE,"test2");
+            // sendComand = createObject(OBJ_STRING, sendStr);
+            // serverLog(LL_NOTICE,"test3");
+            // addReply(c, sendComand);
+            // serverLog(LL_NOTICE,"test4");
+
+            // freeReplyObject(reply);
             redisFree(c);
+            
         }
 
     }
+    free(sendStr);
 }
 
 void feedParityXOR(client* cl, const char* parityXOR)
@@ -478,6 +484,7 @@ void feedParityXOR(client* cl, const char* parityXOR)
         //serverLog(LL_NOTICE, "in the feedParityXOR, the reply is %s", reply -> str);
         freeReplyObject(reply);
         redisFree(c);
+        free(sendStr);
         // serverLog(LL_NOTICE, "the message has already sended .... ");
     }
 }
@@ -486,6 +493,69 @@ void feedParityXORLen(client *cl, const char* key, const char* parityXOR, int le
     // 把这个XOR增量进行发送即可
     const char* parityip = "127.0.0.1";
     int port = 7002;
+
+    // 需要添加非set命令 如果那边解析到了
+    /*添加命令set */
+    // 拼装成一个字符串 直接使用memcpy拷贝到c -> o buffer
+    // set key flag cnt len pairtyXOR
+    // char *sendStr = (char *) malloc(sizeof(char)*100);
+    // memset(sendStr,0,sizeof(char)*100);
+
+    sds sendStr;
+    sendStr = sdsempty();
+    //sendStr = sdsMakeRoomFor(sendStr, 100);
+    sendStr = sdsMakeRoomFor(sendStr, (100 + len));
+    //serverLog(LL_NOTICE,"in the feedParityXORLen, init senStr");
+    size_t argc = 6;
+    sendStr = sdscatfmt(sendStr, "*%i\r\n", argc);
+
+    // serverLog(LL_NOTICE, "the sensStr is %s", sendStr);
+    // set 
+    argc = 3;
+    sendStr = sdscatfmt(sendStr, "$%u\r\n", argc);
+    sendStr = sdscatlen(sendStr, "SET", argc);
+    sendStr = sdscatlen(sendStr, "\r\n", sizeof("\r\n")-1);
+
+    // key
+    argc = strlen(key);
+    sendStr = sdscatfmt(sendStr, "$%u\r\n", argc);
+    sendStr = sdscatlen(sendStr, key, argc);
+    sendStr = sdscatlen(sendStr, "\r\n", sizeof("\r\n")-1);     
+
+    // flag
+    char flag[32];
+    memset(flag, 0, sizeof(char) * 32);
+    ll2string(flag,32,(long)PARITY_READ_BUFFER_AND_UPDATE);
+    sendStr = sdscatfmt(sendStr, "$%u\r\n", strlen(flag));
+    sendStr = sdscatlen(sendStr, flag, strlen(flag));
+    sendStr = sdscatlen(sendStr, "\r\n", sizeof("\r\n")-1);     
+
+    // cnt
+    dictEntry *entry = dictFind(cl->db->dict, cl->argv[1]->ptr);
+    //serverLog(LL_NOTICE, "in the feedParityXORLen, the entry->stat_set_commands = %d", *(int *)entry->stat_set_commands);
+    memset(flag, 0, sizeof(char) * 32);
+    ll2string(flag, 32, *(int *)entry->stat_set_commands);
+    sendStr = sdscatfmt(sendStr, "$%u\r\n", strlen(flag));
+    sendStr = sdscatlen(sendStr, flag, strlen(flag));
+    sendStr = sdscatlen(sendStr, "\r\n", sizeof("\r\n")-1);     
+
+    // len
+    memset(flag, 0, sizeof(char) * 32);
+    ll2string(flag, 32, len);
+    sendStr = sdscatfmt(sendStr, "$%u\r\n", strlen(flag));
+    sendStr = sdscatlen(sendStr, flag, strlen(flag));
+    sendStr = sdscatlen(sendStr, "\r\n", sizeof("\r\n")-1); 
+
+    int beforelen = sdslen(sendStr);
+
+    // value
+    sendStr = sdscatfmt(sendStr, "$%u\r\n", len);
+    sendStr = sdscatlen(sendStr, parityXOR, len);
+    sendStr = sdscatlen(sendStr, "\r\n", sizeof("\r\n")-1);
+
+    int afterlen = sdslen(sendStr);
+    //serverLog(LL_NOTICE, "the len diff is %d", afterlen - beforelen);
+    serverLog(LL_NOTICE, "int the feedParityXORLen, the sensStr is %s", sendStr);
     
     for(port = 7002; port <= 7003; port++){
     
@@ -505,80 +575,33 @@ void feedParityXORLen(client *cl, const char* key, const char* parityXOR, int le
             }
         
             redisReply *reply;
-
-
-            // 需要添加非set命令 如果那边解析到了
-            /*添加命令set */
-            // 拼装成一个字符串 直接使用memcpy拷贝到c -> o buffer
-            // set key flag cnt len pairtyXOR
-            // char *sendStr = (char *) malloc(sizeof(char)*100);
-            // memset(sendStr,0,sizeof(char)*100);
-
-            sds sendStr;
-            sendStr = sdsempty();
-            sendStr = sdsMakeRoomFor(sendStr, 100);
-            size_t argc = 6;
-            sendStr = sdscatfmt(sendStr, "*%i\r\n", argc);
-
-            // serverLog(LL_NOTICE, "the sensStr is %s", sendStr);
-            // set 
-            argc = 3;
-            sendStr = sdscatfmt(sendStr, "$%u\r\n", argc);
-            sendStr = sdscatlen(sendStr, "SET", argc);
-            sendStr = sdscatlen(sendStr, "\r\n", sizeof("\r\n")-1);
-
-            // key
-            argc = strlen(key);
-            sendStr = sdscatfmt(sendStr, "$%u\r\n", argc);
-            sendStr = sdscatlen(sendStr, key, argc);
-            sendStr = sdscatlen(sendStr, "\r\n", sizeof("\r\n")-1);     
             
-            // flag
-            char flag[32];
-            memset(flag, 0, sizeof(char) * 32);
-            ll2string(flag,32,(long)PARITY_READ_BUFFER_AND_UPDATE);
-            sendStr = sdscatfmt(sendStr, "$%u\r\n", strlen(flag));
-            sendStr = sdscatlen(sendStr, flag, strlen(flag));
-            sendStr = sdscatlen(sendStr, "\r\n", sizeof("\r\n")-1);     
-            
-            // cnt
-            dictEntry *entry = dictFind(cl->db->dict, cl->argv[1]->ptr);
-            //serverLog(LL_NOTICE, "in the feedParityXORLen, the entry->stat_set_commands = %d", *(int *)entry->stat_set_commands);
-            memset(flag, 0, sizeof(char) * 32);
-            ll2string(flag, 32, *(int *)entry->stat_set_commands);
-            sendStr = sdscatfmt(sendStr, "$%u\r\n", strlen(flag));
-            sendStr = sdscatlen(sendStr, flag, strlen(flag));
-            sendStr = sdscatlen(sendStr, "\r\n", sizeof("\r\n")-1);     
-            
-            // len
-            memset(flag, 0, sizeof(char) * 32);
-            ll2string(flag, 32, len);
-            sendStr = sdscatfmt(sendStr, "$%u\r\n", strlen(flag));
-            sendStr = sdscatlen(sendStr, flag, strlen(flag));
-            sendStr = sdscatlen(sendStr, "\r\n", sizeof("\r\n")-1); 
-
-            int beforelen = sdslen(sendStr);
-
-            // value
-            sendStr = sdscatfmt(sendStr, "$%u\r\n", len);
-            sendStr = sdscatlen(sendStr, parityXOR, len);
-            sendStr = sdscatlen(sendStr, "\r\n", sizeof("\r\n")-1);
-            
-            int afterlen = sdslen(sendStr);
-            //serverLog(LL_NOTICE, "the len diff is %d", afterlen - beforelen);
-            //serverLog(LL_NOTICE, "the sensStr is %s", sendStr);
             __redisAppendCommand(c, sendStr, afterlen);
 
             //serverLog(LL_NOTICE, "the c -> obuf is %s", c -> obuf);
 
+            // struct timespec t1 = {0, 0};
+            // struct timespec t2 = {0, 0};
+            // clock_gettime(CLOCK_REALTIME, &t1);
+
             /*获取set命令结果*/
             redisGetReply(c,&reply); // reply for SET
             //serverLog(LL_NOTICE, "in the feedParityXORLen, the reply is %s", reply -> str);
+
+            // clock_gettime(CLOCK_REALTIME, &t2);
+            // double sec=t2.tv_sec - t1.tv_sec;
+            // double nsec=t2.tv_nsec - t1.tv_nsec;
+            // sec=sec+nsec/1000000000;
+            // serverLog(LL_NOTICE,"feedParityXORLen, port = %d, time = %f", port, sec);
+            // server.totalSec += sec;
+            // serverLog(LL_NOTICE,"feedParityXORLen, server.totalSec = %f", server.totalSec);
+
             freeReplyObject(reply);
             redisFree(c);
         }
 
     }
+    sdsfree(sendStr);
 }
 
 # endif

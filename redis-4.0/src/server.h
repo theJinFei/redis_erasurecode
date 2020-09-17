@@ -953,6 +953,7 @@ struct redisServer {
     dict* KeyCntDict;           /* map key and cnt */
     dict* CntKeyDict;           /* map key and cnt */
     int *matrix;
+    double totalSec;
 # endif
     dict *orig_commands;        /* Command table before command renaming. */
     aeEventLoop *el;

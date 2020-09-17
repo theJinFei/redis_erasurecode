@@ -382,7 +382,7 @@ void setKey(redisDb *db, robj *key, robj *val) {
     if (lookupKeyWrite(db,key) == NULL) {       
 # ifdef _ERASURE_CODE_
         server.stat_numsetcommands++;
-        serverLog(LL_NOTICE,"this is server.stat_numsetcommands++, and the server.stat_numsetcommands is %d", server.stat_numsetcommands); 
+        //serverLog(LL_NOTICE,"this is server.stat_numsetcommands++, and the server.stat_numsetcommands is %d", server.stat_numsetcommands); 
 # endif
         dbAdd(db,key,val);
         //set, diff=val
