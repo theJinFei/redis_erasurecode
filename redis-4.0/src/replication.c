@@ -288,8 +288,8 @@ void replicationFeedSlaves(list *slaves, int dictid, robj **argv, int argc) {
 # include "./../deps/hiredis/hiredis.h"
 # include "./../deps/hiredis/read.h"
 void feedParityARGV(client *cl, const int argc, robj** argv){
-    const char* parityip = "127.0.0.1";
-    int port = 7002;
+    // const char* parityip = "127.0.0.1";
+    // int port = 7002;
 
     // 需要添加非set命令 如果那边解析到了
     /*添加命令set */
@@ -377,42 +377,59 @@ void feedParityARGV(client *cl, const int argc, robj** argv){
 
     serverLog(LL_NOTICE, "in the feedParityARGV, the sendStr = %s",sendStr);
 
-    for(port = 7002; port <= 7003; port++){
+    MsgLen msgLen;
+    msgLen.type = 1;
+    msgLen.len = strlen(sendStr);
 
-        // 保证这个只执行一遍
-        // serverLog(LL_NOTICE, "the server.port is %d and the port is %d", server.port, port);
-        if(server.port != port && !(server.cluster -> myself -> flags & CLUSTER_NODE_SLAVE)){ 
-            // serverLog(LL_NOTICE, "the flags is  %d and the CLUSTER_NODE_SLAVE is %d", server.cluster -> myself -> flags, CLUSTER_NODE_SLAVE);  
-            // serverLog(LL_NOTICE, "after feedParityARGV, the hostip is %s, the server.port is %d and the port is %d", server.bindaddr, server.port, port);
-            redisContext *c = redisConnect(parityip, port);
-            if (c == NULL || c->err) {
-                if (c) {
-                    serverLog(LL_NOTICE, "Error: %.40s", c->errstr);
-                } else {
-                    serverLog(LL_NOTICE, "Can't allocate redis context");
-                }
-            }
+    Msg msg;
+    msg.type = 1;
+    //msg.sendStr = (char*)malloc(sizeof(char) * msgLen.len);
+    strcpy(msg.sendStr, sendStr);
+
+    int reslen = msgsnd(server.msgid, &msgLen, sizeof(int), 0);
+    serverLog(LL_NOTICE,"send msgLen, type = %ld, len = %d", msgLen.type, msgLen.len);
+
+
+    int res = msgsnd(server.msgid, &msg, msgLen.len, 0);
+    serverLog(LL_NOTICE,"send msg, type = %ld, sendStr = %s", msg.type, msg.sendStr);
+    
+
+    // for(port = 7002; port <= 7003; port++){
+
+    //     // 保证这个只执行一遍
+    //     // serverLog(LL_NOTICE, "the server.port is %d and the port is %d", server.port, port);
+    //     if(server.port != port && !(server.cluster -> myself -> flags & CLUSTER_NODE_SLAVE)){ 
+    //         // serverLog(LL_NOTICE, "the flags is  %d and the CLUSTER_NODE_SLAVE is %d", server.cluster -> myself -> flags, CLUSTER_NODE_SLAVE);  
+    //         // serverLog(LL_NOTICE, "after feedParityARGV, the hostip is %s, the server.port is %d and the port is %d", server.bindaddr, server.port, port);
+    //         redisContext *c = redisConnect(parityip, port);
+    //         if (c == NULL || c->err) {
+    //             if (c) {
+    //                 serverLog(LL_NOTICE, "Error: %.40s", c->errstr);
+    //             } else {
+    //                 serverLog(LL_NOTICE, "Can't allocate redis context");
+    //             }
+    //         }
         
-            redisReply *reply = NULL;
-            redisAppendCommand(c,sendStr);
-            redisGetReply(c,&reply);
-            //serverLog(LL_NOTICE, "in the feedParityARGV, the reply is %s", reply -> str);
+    //         redisReply *reply = NULL;
+    //         redisAppendCommand(c,sendStr);
+    //         redisGetReply(c,&reply);
+    //         //serverLog(LL_NOTICE, "in the feedParityARGV, the reply is %s", reply -> str);
             
-            // serverLog(LL_NOTICE,"test1");
-            // robj *sendComand;
-            // serverLog(LL_NOTICE,"test2");
-            // sendComand = createObject(OBJ_STRING, sendStr);
-            // serverLog(LL_NOTICE,"test3");
-            // addReply(c, sendComand);
-            // serverLog(LL_NOTICE,"test4");
+    //         // serverLog(LL_NOTICE,"test1");
+    //         // robj *sendComand;
+    //         // serverLog(LL_NOTICE,"test2");
+    //         // sendComand = createObject(OBJ_STRING, sendStr);
+    //         // serverLog(LL_NOTICE,"test3");
+    //         // addReply(c, sendComand);
+    //         // serverLog(LL_NOTICE,"test4");
 
-            // freeReplyObject(reply);
-            redisFree(c);
+    //         // freeReplyObject(reply);
+    //         redisFree(c);
             
-        }
+    //     }
 
-    }
-    free(sendStr);
+    // }
+    // free(sendStr);
 }
 
 void feedParityXOR(client* cl, const char* parityXOR)
@@ -491,8 +508,8 @@ void feedParityXOR(client* cl, const char* parityXOR)
 
 void feedParityXORLen(client *cl, const char* key, const char* parityXOR, int len){
     // 把这个XOR增量进行发送即可
-    const char* parityip = "127.0.0.1";
-    int port = 7002;
+    // const char* parityip = "127.0.0.1";
+    // int port = 7002;
 
     // 需要添加非set命令 如果那边解析到了
     /*添加命令set */
@@ -556,54 +573,108 @@ void feedParityXORLen(client *cl, const char* key, const char* parityXOR, int le
     int afterlen = sdslen(sendStr);
     //serverLog(LL_NOTICE, "the len diff is %d", afterlen - beforelen);
     serverLog(LL_NOTICE, "int the feedParityXORLen, the sensStr is %s", sendStr);
+
+    MsgLen msgLen;
+    msgLen.type = 1;
+    msgLen.len = len;
+
+    Msg msg;
+    msg.type = 1;
+    //msg.sendStr = (char*)malloc(sizeof(char) * msgLen.len);
+    memcpy(msg.sendStr, sendStr, msgLen.len);
+
+    int reslen = msgsnd(server.msgid, &msgLen, sizeof(int), 0);
+    serverLog(LL_NOTICE,"send msgLen, type = %ld, len = %d", msgLen.type, msgLen.len);
+
+
+    int res = msgsnd(server.msgid, &msg, msgLen.len, 0);
+    serverLog(LL_NOTICE,"send msg, type = %ld, sendStr = %s", msg.type, msg.sendStr);
     
-    for(port = 7002; port <= 7003; port++){
+    // for(port = 7002; port <= 7003; port++){
     
-        // 保证这个只执行一遍
-        //serverLog(LL_NOTICE, "the server.port is %d and the port is %d", server.port, port);
-        if(server.port != port && !(server.cluster -> myself -> flags & CLUSTER_NODE_SLAVE)){ 
-            //serverLog(LL_NOTICE, "the flags is  %d and the CLUSTER_NODE_SLAVE is %d", server.cluster -> myself -> flags, CLUSTER_NODE_SLAVE);
+    //     // 保证这个只执行一遍
+    //     //serverLog(LL_NOTICE, "the server.port is %d and the port is %d", server.port, port);
+    //     if(server.port != port && !(server.cluster -> myself -> flags & CLUSTER_NODE_SLAVE)){ 
+    //         //serverLog(LL_NOTICE, "the flags is  %d and the CLUSTER_NODE_SLAVE is %d", server.cluster -> myself -> flags, CLUSTER_NODE_SLAVE);
             
-            //serverLog(LL_NOTICE, "after feedParityXORLen, the hostip is %s, the server.port is %d and the port is %d", server.bindaddr, server.port, port);
-            redisContext *c = redisConnect(parityip, port);
-            if (c == NULL || c->err) {
-                if (c) {
-                    serverLog(LL_NOTICE, "Error: %.40s", c->errstr);
-                } else {
-                    serverLog(LL_NOTICE, "Can't allocate redis context");
-                }
-            }
+    //         //serverLog(LL_NOTICE, "after feedParityXORLen, the hostip is %s, the server.port is %d and the port is %d", server.bindaddr, server.port, port);
+    //         redisContext *c = redisConnect(parityip, port);
+    //         if (c == NULL || c->err) {
+    //             if (c) {
+    //                 serverLog(LL_NOTICE, "Error: %.40s", c->errstr);
+    //             } else {
+    //                 serverLog(LL_NOTICE, "Can't allocate redis context");
+    //             }
+    //         }
         
-            redisReply *reply;
+    //         redisReply *reply;
             
-            __redisAppendCommand(c, sendStr, afterlen);
+    //         __redisAppendCommand(c, sendStr, afterlen);
 
-            //serverLog(LL_NOTICE, "the c -> obuf is %s", c -> obuf);
+    //         //serverLog(LL_NOTICE, "the c -> obuf is %s", c -> obuf);
 
-            // struct timespec t1 = {0, 0};
-            // struct timespec t2 = {0, 0};
-            // clock_gettime(CLOCK_REALTIME, &t1);
+    //         // struct timespec t1 = {0, 0};
+    //         // struct timespec t2 = {0, 0};
+    //         // clock_gettime(CLOCK_REALTIME, &t1);
 
-            /*获取set命令结果*/
-            redisGetReply(c,&reply); // reply for SET
-            //serverLog(LL_NOTICE, "in the feedParityXORLen, the reply is %s", reply -> str);
+    //         /*获取set命令结果*/
+    //         redisGetReply(c,&reply); // reply for SET
+    //         //serverLog(LL_NOTICE, "in the feedParityXORLen, the reply is %s", reply -> str);
 
-            // clock_gettime(CLOCK_REALTIME, &t2);
-            // double sec=t2.tv_sec - t1.tv_sec;
-            // double nsec=t2.tv_nsec - t1.tv_nsec;
-            // sec=sec+nsec/1000000000;
-            // serverLog(LL_NOTICE,"feedParityXORLen, port = %d, time = %f", port, sec);
-            // server.totalSec += sec;
-            // serverLog(LL_NOTICE,"feedParityXORLen, server.totalSec = %f", server.totalSec);
+    //         // clock_gettime(CLOCK_REALTIME, &t2);
+    //         // double sec=t2.tv_sec - t1.tv_sec;
+    //         // double nsec=t2.tv_nsec - t1.tv_nsec;
+    //         // sec=sec+nsec/1000000000;
+    //         // serverLog(LL_NOTICE,"feedParityXORLen, port = %d, time = %f", port, sec);
+    //         // server.totalSec += sec;
+    //         // serverLog(LL_NOTICE,"feedParityXORLen, server.totalSec = %f", server.totalSec);
 
-            freeReplyObject(reply);
-            redisFree(c);
-        }
+    //         freeReplyObject(reply);
+    //         redisFree(c);
+    //     }
 
-    }
-    sdsfree(sendStr);
+    // }
+    // sdsfree(sendStr);
 }
 
+int feedParityAll(){
+    Msg msg_rcv;
+    MsgLen msglen_rcv;
+    long type = 1;
+
+    const char* parityip = "127.0.0.1";
+    int port = 7002;
+
+    serverLog(LL_NOTICE,"in the feedParityAll");
+    while(1) {
+        memset(msg_rcv.sendStr, 0, MSG_VALUE_SIZE);
+        
+        int reslen = msgrcv(server.msgid, &msglen_rcv, sizeof(int), type, 0);
+        serverLog(LL_NOTICE,"in msglen_rcv, type = %ld, len = %d", msglen_rcv.type, msglen_rcv.len);
+
+        int res = msgrcv(server.msgid, &msg_rcv, msglen_rcv.len *sizeof(char), type, 0);
+        serverLog(LL_NOTICE,"in msg_rcv, type = %ld, sendStr = %s", msg_rcv.type, msg_rcv.sendStr);
+
+        for(port = 7002; port <= 7003; port++){
+            if(server.port != port && !(server.cluster -> myself -> flags & CLUSTER_NODE_SLAVE)){ 
+                redisContext *c = redisConnect(parityip, port);
+                if (c == NULL || c->err) {
+                    if (c) {
+                        serverLog(LL_NOTICE, "Error: %.40s", c->errstr);
+                    } else {
+                        serverLog(LL_NOTICE, "Can't allocate redis context");
+                    }
+                }
+            
+                redisReply *reply = NULL;
+                redisAppendCommand(c,msg_rcv.sendStr);
+                redisGetReply(c,&reply);
+                redisFree(c); 
+            }
+        }
+    }
+    return C_OK;
+}
 # endif
 
 

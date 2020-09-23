@@ -1926,6 +1926,8 @@ void initServer(void) {
             serverLog(LL_NOTICE, "%d", server.matrix[i*k+j]); 
         }
     }
+
+    server.msgid = msgget(IPC_PRIVATE, IPC_CREAT | 0664);
 # endif
     server.current_client = NULL;
     server.clients = listCreate();
@@ -4989,11 +4991,39 @@ int main(int argc, char **argv) {
         serverLog(LL_WARNING,"WARNING: You specified a maxmemory value that is less than 1MB (current value is %llu bytes). Are you sure this is what you really want?", server.maxmemory);
     }
 
-    aeSetBeforeSleepProc(server.el,beforeSleep);
-    aeSetAfterSleepProc(server.el,afterSleep);
-    aeMain(server.el);
-    aeDeleteEventLoop(server.el);
-    return 0;
+#ifdef _ERASURE_CODE_
+    if((server.port == 7000) || (server.port == 7001) || (server.port == 7004)){
+        pid_t childpid;
+        if ((childpid = fork()) == 0) {
+            //child
+            if(feedParityAll() == C_OK){
+                exitFromChild(0);
+            }
+            else{
+                exitFromChild(1);
+            }
+            // serverLog(LL_NOTICE,"in the child thread");
+            // exit(0);
+        }
+        else{
+            //parent
+            aeSetBeforeSleepProc(server.el,beforeSleep);
+            aeSetAfterSleepProc(server.el,afterSleep);
+            aeMain(server.el);
+            aeDeleteEventLoop(server.el);
+            return 0;
+        }
+    }
+    else{
+#endif
+        aeSetBeforeSleepProc(server.el,beforeSleep);
+        aeSetAfterSleepProc(server.el,afterSleep);
+        aeMain(server.el);
+        aeDeleteEventLoop(server.el);
+        return 0;
+#ifdef _ERASURE_CODE_        
+    }
+#endif
 }
 
 /* The End */

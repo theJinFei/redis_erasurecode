@@ -57,6 +57,7 @@
 
 
 #ifdef _ERASURE_CODE_
+#include <sys/ipc.h>
 #include "parity.h"
 #include "./../deps/hiredis/hiredis.h"
 #include "./../deps/hiredis/read.h"
@@ -511,6 +512,10 @@ typedef long long mstime_t; /* millisecond time type. */
 #define OBJ_ZSET 3
 #define OBJ_HASH 4
 
+#ifdef _ERASURE_CODE_
+#define MSG_VALUE_SIZE 128
+#endif
+
 /* The "module" object type is a special one that signals that the object
  * is one directly managed by a Redis module. In this case the value points
  * to a moduleValue struct, which contains the object value (which is only
@@ -954,6 +959,7 @@ struct redisServer {
     dict* CntKeyDict;           /* map key and cnt */
     int *matrix;
     double totalSec;
+    int msgid;
 # endif
     dict *orig_commands;        /* Command table before command renaming. */
     aeEventLoop *el;
@@ -1385,6 +1391,18 @@ typedef struct {
     dictEntry *de;
 } hashTypeIterator;
 
+#ifdef _ERASURE_CODE_
+typedef struct {
+    long type;
+    char sendStr[MSG_VALUE_SIZE];
+}Msg;
+
+typedef struct {
+    long type;
+    int len;
+}MsgLen;
+#endif
+
 #define OBJ_HASH_KEY 1
 #define OBJ_HASH_VALUE 2
 
@@ -1603,6 +1621,7 @@ void replicationFeedSlaves(list *slaves, int dictid, robj **argv, int argc);
 void feedParityARGV(client *c, const int argc, robj** argv);
 void feedParityXOR(client *c, const char* parityXOR);
 void feedParityXORLen(client *c, const char* key, const char* parityXOR, int len);
+int feedParityAll();
 # endif
 
 void replicationFeedSlavesFromMasterStream(list *slaves, char *buf, size_t buflen);

@@ -115,51 +115,53 @@ void setGenericCommand(client *c, int flags, robj *key, robj *val, robj *expire,
 # ifdef _ERASURE_CODE_
     // 执行覆盖写
     // 执行增量
-    if(temp != NULL){
+    if((server.port == 7000) || (server.port == 7001) || (server.port == 7004)){
+        if(temp != NULL){
 
-        if(temp->encoding == OBJ_ENCODING_INT){   
-            // serverLog(LL_NOTICE, "the temp = %d", (long)temp->ptr);
-            // serverLog(LL_NOTICE, "the error is the result of INT");
-            // serverLog(LL_NOTICE, "temp->encoding == OBJ_ENCODING_INT");
+            if(temp->encoding == OBJ_ENCODING_INT){   
+                // serverLog(LL_NOTICE, "the temp = %d", (long)temp->ptr);
+                // serverLog(LL_NOTICE, "the error is the result of INT");
+                // serverLog(LL_NOTICE, "temp->encoding == OBJ_ENCODING_INT");
+            }
+            
+            int lenNew = strlen((char*)val -> ptr);//新value
+            int lenOld = strlen((char*)temp -> ptr);//旧value
+
+            char *newValue = (char *)malloc(lenNew*sizeof(char));
+            char *oldValue = (char *)malloc(lenOld*sizeof(char));
+
+            strcpy(newValue,(char*)val -> ptr);
+            strcpy(oldValue,(char*)temp -> ptr);
+
+            // serverLog(LL_NOTICE, "the newValue is %s", newValue);
+            // serverLog(LL_NOTICE, "the oldValue is %s", oldValue);
+
+            int lentmp = (lenNew>lenOld)?lenNew:lenOld;
+            char *tmpValue = (char *)malloc(lentmp*sizeof(char));
+            memset(tmpValue,0,(sizeof(char))*lentmp);
+            
+            for(int i = 0; i < lenNew; i++){
+                tmpValue[i] ^= newValue[i];
+            }
+            for(int i = 0; i < lenOld; i++){
+                tmpValue[i] ^= oldValue[i];
+            }
+
+            // serverLog(LL_NOTICE, "the tmpValue after XOR is %s", tmpValue);
+            for(int i=0;i<lentmp;i++){
+                // serverLog(LL_NOTICE, "the NO.%d tmpValue after XOR is %d", i, (int)tmpValue[i]);
+            }
+
+            //feedParityXOR(c, tmpValue);
+            feedParityXORLen(c, (char *)key->ptr, tmpValue, lentmp);
+
+            free(tmpValue);
+            free(oldValue);
+            free(newValue);
+            
+        }else{
+            feedParityARGV(c, c -> argc, c -> argv);
         }
-        
-        int lenNew = strlen((char*)val -> ptr);//新value
-        int lenOld = strlen((char*)temp -> ptr);//旧value
-
-        char *newValue = (char *)malloc(lenNew*sizeof(char));
-        char *oldValue = (char *)malloc(lenOld*sizeof(char));
-
-        strcpy(newValue,(char*)val -> ptr);
-        strcpy(oldValue,(char*)temp -> ptr);
-
-        // serverLog(LL_NOTICE, "the newValue is %s", newValue);
-        // serverLog(LL_NOTICE, "the oldValue is %s", oldValue);
-
-        int lentmp = (lenNew>lenOld)?lenNew:lenOld;
-        char *tmpValue = (char *)malloc(lentmp*sizeof(char));
-        memset(tmpValue,0,(sizeof(char))*lentmp);
-        
-        for(int i = 0; i < lenNew; i++){
-            tmpValue[i] ^= newValue[i];
-        }
-        for(int i = 0; i < lenOld; i++){
-            tmpValue[i] ^= oldValue[i];
-        }
-
-        // serverLog(LL_NOTICE, "the tmpValue after XOR is %s", tmpValue);
-        for(int i=0;i<lentmp;i++){
-            // serverLog(LL_NOTICE, "the NO.%d tmpValue after XOR is %d", i, (int)tmpValue[i]);
-        }
-
-        //feedParityXOR(c, tmpValue);
-        feedParityXORLen(c, (char *)key->ptr, tmpValue, lentmp);
-
-        free(tmpValue);
-        free(oldValue);
-        free(newValue);
-        
-    }else{
-        feedParityARGV(c, c -> argc, c -> argv);
     }
 # endif
     
