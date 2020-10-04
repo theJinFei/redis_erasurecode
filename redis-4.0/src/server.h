@@ -513,7 +513,7 @@ typedef long long mstime_t; /* millisecond time type. */
 #define OBJ_HASH 4
 
 #ifdef _ERASURE_CODE_
-#define MSG_VALUE_SIZE 128
+#define MSG_VALUE_SIZE 32
 #endif
 
 /* The "module" object type is a special one that signals that the object
@@ -959,7 +959,8 @@ struct redisServer {
     dict* CntKeyDict;           /* map key and cnt */
     int *matrix;
     double totalSec;
-    int msgid;
+    int msgid7002;
+    int msgid7003;
 # endif
     dict *orig_commands;        /* Command table before command renaming. */
     aeEventLoop *el;
@@ -1619,9 +1620,8 @@ void replicationFeedSlaves(list *slaves, int dictid, robj **argv, int argc);
 
 # ifdef _ERASURE_CODE_
 void feedParityARGV(client *c, const int argc, robj** argv);
-void feedParityXOR(client *c, const char* parityXOR);
 void feedParityXORLen(client *c, const char* key, const char* parityXOR, int len);
-int feedParityAll();
+int feedParityAll(int port);
 # endif
 
 void replicationFeedSlavesFromMasterStream(list *slaves, char *buf, size_t buflen);

@@ -1094,6 +1094,7 @@ void resetClient(client *c) {
  * a protocol error: in such a case the client structure is setup to reply
  * with the error and close the connection. */
 int processInlineBuffer(client *c) {
+    serverLog(LL_NOTICE,"in the processInlineBuffer");
     char *newline;
     int argc, j, linefeed_chars = 1;
     sds *argv, aux;
@@ -1197,12 +1198,15 @@ static void setProtocolError(const char *errstr, client *c, long pos) {
  * command is in RESP format, so the first byte in the command is found
  * to be '*'. Otherwise for inline commands processInlineBuffer() is called. */
 int processMultibulkBuffer(client *c) {
+    serverLog(LL_NOTICE,"in the processMultibulkBuffer");
     char *newline = NULL;
     long pos = 0;
     int ok;
     long long ll;
 
     if (c->multibulklen == 0) {
+        serverLog(LL_NOTICE,"c->multibulklen == 0");
+        serverLog(LL_NOTICE,"c->argc = %d", c->argc);
         /* The client should have been reset */
         serverAssertWithInfo(c,NULL,c->argc == 0);
 
@@ -1364,7 +1368,7 @@ void processInputBuffer(client *c) {
                 c->reqtype = PROTO_REQ_INLINE;
             }
         }
-
+        serverLog(LL_NOTICE,"before processMultibulkBuffer");
         if (c->reqtype == PROTO_REQ_INLINE) {
             if (processInlineBuffer(c) != C_OK) break;
         } else if (c->reqtype == PROTO_REQ_MULTIBULK) {
@@ -1372,6 +1376,7 @@ void processInputBuffer(client *c) {
         } else {
             serverPanic("Unknown request type");
         }
+        serverLog(LL_NOTICE,"after processMultibulkBuffer");
 
 # ifdef _ERASURE_CODE_
 #include "parity.h"

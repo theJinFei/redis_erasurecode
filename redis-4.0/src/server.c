@@ -1927,7 +1927,9 @@ void initServer(void) {
         }
     }
 
-    server.msgid = msgget(IPC_PRIVATE, IPC_CREAT | 0664);
+    server.msgid7002 = msgget(IPC_PRIVATE, IPC_CREAT | 0664);
+    server.msgid7003 = msgget(IPC_PRIVATE, IPC_CREAT | 0664);
+    serverLog(LL_NOTICE,"the msgid7002 = %d, the msgid7003 = %d", server.msgid7002, server.msgid7003);
 # endif
     server.current_client = NULL;
     server.clients = listCreate();
@@ -4993,25 +4995,37 @@ int main(int argc, char **argv) {
 
 #ifdef _ERASURE_CODE_
     if((server.port == 7000) || (server.port == 7001) || (server.port == 7004)){
-        pid_t childpid;
-        if ((childpid = fork()) == 0) {
-            //child
-            if(feedParityAll() == C_OK){
+        pid_t pid7002;
+        pid_t pid7003;
+        if ((pid7002 = fork()) == 0) {
+            //child7002
+            int msgport = 7002;
+            if(feedParityAll(msgport) == C_OK){
                 exitFromChild(0);
             }
             else{
                 exitFromChild(1);
             }
-            // serverLog(LL_NOTICE,"in the child thread");
-            // exit(0);
         }
         else{
-            //parent
-            aeSetBeforeSleepProc(server.el,beforeSleep);
-            aeSetAfterSleepProc(server.el,afterSleep);
-            aeMain(server.el);
-            aeDeleteEventLoop(server.el);
-            return 0;
+            if ((pid7003 = fork()) == 0) {
+                //child7003
+                int msgport = 7003;
+                if(feedParityAll(msgport) == C_OK){
+                    exitFromChild(0);
+                }
+                else{
+                    exitFromChild(1);
+                }
+            }
+            else{
+                //parent
+                aeSetBeforeSleepProc(server.el,beforeSleep);
+                aeSetAfterSleepProc(server.el,afterSleep);
+                aeMain(server.el);
+                aeDeleteEventLoop(server.el);
+                return 0;
+            }
         }
     }
     else{
