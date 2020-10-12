@@ -61,6 +61,8 @@
 #include "parity.h"
 #include "./../deps/hiredis/hiredis.h"
 #include "./../deps/hiredis/read.h"
+#include "./../deps/hiredis/adapters/libevent.h"
+#include "./../deps/hiredis/async.h"
 #include "./../deps/Jerasure-1.2/jerasure.h"
 #include "./../deps/Jerasure-1.2/reed_sol.h"
 
@@ -513,7 +515,7 @@ typedef long long mstime_t; /* millisecond time type. */
 #define OBJ_HASH 4
 
 #ifdef _ERASURE_CODE_
-#define MSG_VALUE_SIZE 32
+#define MSG_VALUE_SIZE 128
 #endif
 
 /* The "module" object type is a special one that signals that the object
@@ -1622,6 +1624,12 @@ void replicationFeedSlaves(list *slaves, int dictid, robj **argv, int argc);
 void feedParityARGV(client *c, const int argc, robj** argv);
 void feedParityXORLen(client *c, const char* key, const char* parityXOR, int len);
 int feedParityAll(int port);
+int feedParityPipelineAll(int port);
+int feedParityAsyncAll(int port);
+void setCallback(redisAsyncContext *c, void *r, void *privdata);
+void getCallback(redisAsyncContext *c, void *r, void *privdata);
+void connectCallback(const redisAsyncContext *c, int status);
+void disconnectCallback(const redisAsyncContext *c, int status);
 # endif
 
 void replicationFeedSlavesFromMasterStream(list *slaves, char *buf, size_t buflen);

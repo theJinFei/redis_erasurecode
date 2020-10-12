@@ -504,7 +504,8 @@ void feedParityXORLen(client *cl, const char* key, const char* parityXOR, int le
 
     MsgLen msgLen;
     msgLen.type = 1;
-    msgLen.len = len;
+    msgLen.len = len + beforelen;//len is the length of value, and beforelen is the length of sendStr without value
+    serverLog(LL_NOTICE, "int the feedParityXORLen, the msgLen.len is %d", msgLen.len);
 
     Msg msg;
     msg.type = 1;
@@ -607,10 +608,157 @@ int feedParityAll(int port){
             redisReply *reply = NULL;
             redisAppendCommand(c,msg_rcv.sendStr);
             redisGetReply(c,&reply); 
+            serverLog(LL_NOTICE, "the reply is %s", (char *)reply->str);
             redisFree(c); 
         }
     }
     return C_OK;
+}
+
+int feedParityPipelineAll(int port){
+    Msg msg_rcv;
+    MsgLen msglen_rcv;
+    int rcvid;
+    long type = 1;
+    int pipeline = 10;
+
+    if(port == 7002){
+        rcvid = server.msgid7002;
+    }else if(port == 7003){
+        rcvid = server.msgid7003;
+    }else{
+        serverLog(LL_NOTICE,"in the feedParityAll, port error");
+    }
+
+    const char* parityip = "127.0.0.1";
+    redisReply *reply = NULL;
+
+    serverLog(LL_NOTICE,"in the feedParityAll");
+
+    if(server.port != port && !(server.cluster -> myself -> flags & CLUSTER_NODE_SLAVE)){
+        while(1) {
+            redisContext *c = redisConnect(parityip, port);
+            for(int i = 0; i < pipeline; i++){
+                memset(msg_rcv.sendStr, 0, MSG_VALUE_SIZE);
+            
+                int reslen = msgrcv(rcvid, &msglen_rcv, sizeof(int), type, 0);
+                serverLog(LL_NOTICE,"in msglen_rcv, type = %ld, len = %d, port = %d", msglen_rcv.type, msglen_rcv.len, port);
+
+                int res = msgrcv(rcvid, &msg_rcv, msglen_rcv.len *sizeof(char), type, 0);
+                serverLog(LL_NOTICE,"in msg_rcv, type = %ld, sendStr = %s, port = %d", msg_rcv.type, msg_rcv.sendStr, port);
+                    
+                redisAppendCommand(c,msg_rcv.sendStr);
+                serverLog(LL_NOTICE, "redisAppendCommand and msg_rcv.sendStr: %s", msg_rcv.sendStr);
+            }
+            for(int i = 0; i < pipeline; i++){                
+                redisGetReply(c,&reply); 
+                serverLog(LL_NOTICE, "the reply is %s", (char *)reply->str);
+            }
+            redisFree(c);
+        }
+    }
+    return C_OK;
+}
+
+int feedParityAsyncAll(int port){
+    serverLog(LL_NOTICE,"in the feedParityAsyncAll, the port is %d", port);
+
+    Msg msg_rcv;
+    MsgLen msglen_rcv;
+    int rcvid;
+    long type = 1;
+
+    int commandCount = 0;
+
+    if(port == 7002){
+        rcvid = server.msgid7002;
+    }else if(port == 7003){
+        rcvid = server.msgid7003;
+    }else{
+        serverLog(LL_NOTICE,"in the feedParityAsyncAll, port error");
+    }
+
+    signal(SIGPIPE, SIG_IGN);
+
+    struct event_base *base = event_base_new();
+
+    while(1) {
+        redisAsyncContext *c = redisAsyncConnect("127.0.0.1", port);
+        if (c->err) {
+            /* Let *c leak for now... */
+            serverLog(LL_NOTICE, "redisAsyncContext Error: %s\n", c->errstr);
+            return 1;
+        }
+
+        redisLibeventAttach(c,base);
+        redisAsyncSetConnectCallback(c,connectCallback);
+        redisAsyncSetDisconnectCallback(c,disconnectCallback);
+
+        while(1){
+            memset(msg_rcv.sendStr, 0, MSG_VALUE_SIZE);
+        
+            int reslen = msgrcv(rcvid, &msglen_rcv, sizeof(int), type, 0);
+            serverLog(LL_NOTICE,"in msglen_rcv, type = %ld, len = %d, port = %d", msglen_rcv.type, msglen_rcv.len, port);
+
+            int res = msgrcv(rcvid, &msg_rcv, msglen_rcv.len *sizeof(char), type, 0);
+            serverLog(LL_NOTICE,"in msg_rcv, type = %ld, sendStr = %s, port = %d", msg_rcv.type, msg_rcv.sendStr, port);
+
+            if(server.port != port && !(server.cluster -> myself -> flags & CLUSTER_NODE_SLAVE)){   
+                redisAsyncCommand(c, setCallback, NULL, msg_rcv.sendStr);
+                commandCount++;
+                serverLog(LL_NOTICE, "redisAsyncCommand commandCount: %d, msg_rcv.sendStr: %s", commandCount, msg_rcv.sendStr);
+            }
+            if(commandCount % 10 == 0){
+                serverLog(LL_NOTICE, "event_base_dispatch, commandCount = %d", commandCount);
+                event_base_dispatch(base);
+                break;
+            }
+        }
+        
+    }
+    return C_OK;
+}
+
+void setCallback(redisAsyncContext *c, void *r, void *privdata) {
+    redisReply *reply = r;
+    if (reply == NULL) {
+        if (c->errstr) {
+            serverLog(LL_NOTICE, "in setCallback, errstr: %s", c->errstr);
+        }
+        return;
+    }
+    serverLog(LL_NOTICE, "in setCallback, reply is %s", reply->str);
+    redisAsyncDisconnect(c);
+}
+
+void getCallback(redisAsyncContext *c, void *r, void *privdata) {
+    redisReply *reply = r;
+    if (reply == NULL) {
+        if (c->errstr) {
+            serverLog(LL_NOTICE, "in getCallback, errstr: %s", c->errstr);
+        }
+        return;
+    }
+    serverLog(LL_NOTICE, "in getCallback, argv[%s]: %s", (char*)privdata, reply->str);
+
+    /* Disconnect after receiving the reply to GET */
+    redisAsyncDisconnect(c);
+}
+
+void connectCallback(const redisAsyncContext *c, int status) {
+    if (status != REDIS_OK) {
+        serverLog(LL_NOTICE, "in connectCallback, Error: %s", c->errstr);
+        return;
+    }
+    serverLog(LL_NOTICE, "in connectCallback, Connected...");
+}
+
+void disconnectCallback(const redisAsyncContext *c, int status) {
+    if (status != REDIS_OK) {
+        serverLog(LL_NOTICE, "in disconnectCallback, Error: %s", c->errstr);
+        return;
+    }
+    serverLog(LL_NOTICE, "in disconnectCallback, Disconnected...");
 }
 # endif
 

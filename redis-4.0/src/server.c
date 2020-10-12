@@ -5000,7 +5000,8 @@ int main(int argc, char **argv) {
         if ((pid7002 = fork()) == 0) {
             //child7002
             int msgport = 7002;
-            if(feedParityAll(msgport) == C_OK){
+            serverLog(LL_NOTICE, "in the pid7002");
+            if(feedParityAsyncAll(msgport) == C_OK){
                 exitFromChild(0);
             }
             else{
@@ -5011,7 +5012,8 @@ int main(int argc, char **argv) {
             if ((pid7003 = fork()) == 0) {
                 //child7003
                 int msgport = 7003;
-                if(feedParityAll(msgport) == C_OK){
+                serverLog(LL_NOTICE, "in the pid7003");
+                if(feedParityAsyncAll(msgport) == C_OK){
                     exitFromChild(0);
                 }
                 else{

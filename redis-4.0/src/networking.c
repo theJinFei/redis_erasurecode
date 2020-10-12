@@ -1207,8 +1207,13 @@ int processMultibulkBuffer(client *c) {
     if (c->multibulklen == 0) {
         serverLog(LL_NOTICE,"c->multibulklen == 0");
         serverLog(LL_NOTICE,"c->argc = %d", c->argc);
+        for(int i = 0; i < c -> argc; i++){
+            robj* o = getDecodedObject(c -> argv[i]);
+            serverLog(LL_NOTICE,"in the processMultibulkBuffer, o -> ptr is %s", (char *)(o -> ptr));
+        }
         /* The client should have been reset */
         serverAssertWithInfo(c,NULL,c->argc == 0);
+        serverLog(LL_NOTICE,"after serverAssertWithInfo");
 
         /* Multi bulk length cannot be read without a \r\n */
         newline = strchr(c->querybuf,'\r');
@@ -1369,6 +1374,7 @@ void processInputBuffer(client *c) {
             }
         }
         serverLog(LL_NOTICE,"before processMultibulkBuffer");
+        serverLog(LL_NOTICE,"the c->querybuf is %s", c->querybuf);
         if (c->reqtype == PROTO_REQ_INLINE) {
             if (processInlineBuffer(c) != C_OK) break;
         } else if (c->reqtype == PROTO_REQ_MULTIBULK) {
@@ -1470,12 +1476,18 @@ void processInputBuffer(client *c) {
                         serverLog(LL_NOTICE,"Entry->val: %s", (char*)tmp->v.val);
                         serverLog(LL_NOTICE,"Entry->val_len: %d", *(int*)tmp->val_len);
 
-                        addReplyBulk(c,c->argv[5]); 
+                        robj *replyOK = createObject(OBJ_STRING,sdsnew("+OK\r\n"));
+                        addReply(c, replyOK); 
+                        serverLog(LL_NOTICE, "after addReply, the reply is %s", (char *)replyOK->ptr);
                         parity_flag = 1;
                     }
                     else{
                         serverLog(LL_NOTICE,"The entry is empty");
-                    }   
+                    }  
+                    if (!(c->flags & CLIENT_BLOCKED) || c->btype != BLOCKED_MODULE){
+                        serverLog(LL_NOTICE ,"Don't reset the client structure for clients blocked");
+                        resetClient(c);
+                    } 
                 }
                 // clock_gettime(CLOCK_REALTIME, &t2);
                 // double sec=t2.tv_sec - t1.tv_sec;
@@ -1499,12 +1511,19 @@ void processInputBuffer(client *c) {
                         serverLog(LL_NOTICE,"Entry->key: %s", (char*)tmp->key);
                         serverLog(LL_NOTICE,"Entry->val: %s", (char*)tmp->v.val);
                         serverLog(LL_NOTICE,"Entry->val_len: %d", *(int*)tmp->val_len);
-                        addReplyBulk(c,c->argv[5]);   
+
+                        robj *replyOK = createObject(OBJ_STRING,sdsnew("+OK\r\n"));
+                        addReply(c, replyOK); 
+                        serverLog(LL_NOTICE, "after addReply, the reply is %s", (char *)replyOK->ptr);
                         parity_flag = 1;
                     }
                     else{
                         serverLog(LL_NOTICE,"The entry is empty");
-                    }       
+                    }  
+                    if (!(c->flags & CLIENT_BLOCKED) || c->btype != BLOCKED_MODULE){
+                        serverLog(LL_NOTICE ,"Don't reset the client structure for clients blocked");
+                        resetClient(c);
+                    }    
                 }
                 break;
             }
@@ -1537,19 +1556,21 @@ void processInputBuffer(client *c) {
             }
         }  
 # endif
-
         if(parity_flag == 1){
             continue;
         }
 
         /* Multibulk processing could see a <= 0 length. */
         if (c->argc == 0) {
+            serverLog(LL_NOTICE ,"c->argc == 0 and resetClient");
             resetClient(c);
         } else {
             /* Only reset the client when the command was executed. */
             if (processCommand(c) == C_OK) {
+                serverLog(LL_NOTICE ,"processCommand is C_OK");
                 if (c->flags & CLIENT_MASTER && !(c->flags & CLIENT_MULTI)) {
                     /* Update the applied replication offset of our master. */
+                    serverLog(LL_NOTICE ,"Update the applied replication offset of our master.");
                     c->reploff = c->read_reploff - sdslen(c->querybuf);
                 }
 
@@ -1557,13 +1578,19 @@ void processInputBuffer(client *c) {
                  * module blocking command, so that the reply callback will
                  * still be able to access the client argv and argc field.
                  * The client will be reset in unblockClientFromModule(). */
-                if (!(c->flags & CLIENT_BLOCKED) || c->btype != BLOCKED_MODULE)
+                if (!(c->flags & CLIENT_BLOCKED) || c->btype != BLOCKED_MODULE){
+                    serverLog(LL_NOTICE ,"Don't reset the client structure for clients blocked");
                     resetClient(c);
+                }
+                    
             }
             /* freeMemoryIfNeeded may flush slave output buffers. This may
              * result into a slave, that may be the active client, to be
              * freed. */
-            if (server.current_client == NULL) break;
+            if (server.current_client == NULL) {
+                serverLog(LL_NOTICE ,"server.current_client == NULL");
+                break;
+            }
         }
 
     }//while循环
