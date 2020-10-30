@@ -5001,7 +5001,7 @@ int main(int argc, char **argv) {
             //child7002
             int msgport = 7002;
             serverLog(LL_NOTICE, "in the pid7002");
-            if(feedParityAsyncAll(msgport) == C_OK){
+            if(feedParityPipelineAll(msgport) == C_OK){
                 exitFromChild(0);
             }
             else{
@@ -5013,7 +5013,7 @@ int main(int argc, char **argv) {
                 //child7003
                 int msgport = 7003;
                 serverLog(LL_NOTICE, "in the pid7003");
-                if(feedParityAsyncAll(msgport) == C_OK){
+                if(feedParityPipelineAll(msgport) == C_OK){
                     exitFromChild(0);
                 }
                 else{

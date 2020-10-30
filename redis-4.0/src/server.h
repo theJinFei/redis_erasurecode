@@ -515,7 +515,7 @@ typedef long long mstime_t; /* millisecond time type. */
 #define OBJ_HASH 4
 
 #ifdef _ERASURE_CODE_
-#define MSG_VALUE_SIZE 128
+#define MSG_VALUE_SIZE 4224
 #endif
 
 /* The "module" object type is a special one that signals that the object
