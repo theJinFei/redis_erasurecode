@@ -515,7 +515,7 @@ typedef long long mstime_t; /* millisecond time type. */
 #define OBJ_HASH 4
 
 #ifdef _ERASURE_CODE_
-#define MSG_VALUE_SIZE 4224
+#define MSG_VALUE_SIZE 128
 #endif
 
 /* The "module" object type is a special one that signals that the object
@@ -960,7 +960,7 @@ struct redisServer {
     dict* KeyCntDict;           /* map key and cnt */
     dict* CntKeyDict;           /* map key and cnt */
     int *matrix;
-    double totalSec;
+    //double totalSec;
     int msgid7002;
     int msgid7003;
 # endif
@@ -1767,8 +1767,9 @@ int processRecoverySignalData(client *c);
 
 int processRecoveryAll(client *c);
 
-int erasure_encode_firstkey(dict *d, void *cnt, void *val, int keyFlag);
-int erasure_encode_anotherkey(dict *d, void *cnt, void *val, void *val_len, int keyFlag);
+//int erasure_encode_firstkey(dict *d, void *cnt, void *val, int keyFlag);
+int erasure_encode_firstkey(client *c, int keyFlag);
+int erasure_encode_anotherkey(client *c, void *val_len, int keyFlag);
 #endif
 
 void setupSignalHandlers(void);

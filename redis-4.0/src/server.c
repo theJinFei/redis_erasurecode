@@ -530,6 +530,7 @@ uint64_t dictObjHash(const void *key) {
 }
 
 uint64_t dictSdsHash(const void *key) {
+    serverLog(LL_NOTICE,"in the dictSdsHash, and the key is %s", key);
     return dictGenHashFunction((unsigned char*)key, sdslen((char*)key));
 }
 
@@ -2710,8 +2711,8 @@ int processEncodeCommand(client *c, int keyFlag){
     //val_len = c->argv[4];
     //val = c->argv[5];
 
-    int * tmpCnt = (int *)malloc(strlen((char *)c->argv[5]->ptr)*sizeof(int));
-    * tmpCnt = strlen((char *)c->argv[5]->ptr);
+    // int * tmpCnt = (int *)malloc(strlen((char *)c->argv[5]->ptr)*sizeof(int));
+    // * tmpCnt = strlen((char *)c->argv[5]->ptr);
     //serverLog(LL_NOTICE, "in the processEncodeCommand, the val_len = %d", *tmpCnt);
     //free(tmpCnt);
 
@@ -2719,10 +2720,15 @@ int processEncodeCommand(client *c, int keyFlag){
         //全新的cnt，向hash表中插入key,val,cnt
         serverLog(LL_NOTICE,"in the dbAddParity");
 
-        sds copy = sdsdup(c->argv[3]->ptr);
-        if(erasure_encode_firstkey(server.parityDict, copy, c->argv[5]->ptr, keyFlag) != C_OK){
+        // sds copy = sdsdup(c->argv[3]->ptr);
+        // if(erasure_encode_firstkey(server.parityDict, copy, c->argv[5]->ptr, keyFlag) != C_OK){
+        //     return C_ERR;
+        // }
+
+        if(erasure_encode_firstkey(c, keyFlag) != C_OK){
             return C_ERR;
         }
+
     } else {
         //已经有过的cnt
         //另一个data node的同cnt命令，做校验后插入
@@ -2733,8 +2739,7 @@ int processEncodeCommand(client *c, int keyFlag){
     
         // int flag = 1;
         // dictReplaceParity(server.parityDict, c->argv[3]->ptr, c->argv[1]->ptr, c->argv[5]->ptr, tmpCnt, flag);
-        sds copy = sdsdup(c->argv[3]->ptr);
-        if(erasure_encode_anotherkey(server.parityDict, copy, c->argv[5]->ptr, NULL, keyFlag) != C_OK){
+        if(erasure_encode_anotherkey(c, NULL, keyFlag) != C_OK){
             return C_ERR;
         }
     }
@@ -2803,7 +2808,7 @@ int processUpdateParityCommand(client *c){
         //serverLog(LL_NOTICE, "before updateParity, the flag is %d", flag);
 
         sds copy = sdsdup(c->argv[3]->ptr);
-        erasure_encode_anotherkey(server.parityDict, copy, c->argv[5]->ptr, c->argv[4]->ptr, flag);
+        erasure_encode_anotherkey(c, c->argv[4]->ptr, flag);
     }
     return C_OK;
 }
@@ -3195,7 +3200,15 @@ int processRecoveryAll(client *c){
 }
 
 
-int erasure_encode_firstkey(dict *d, void *cnt, void *val, int keyFlag){
+int erasure_encode_firstkey(client *c, int keyFlag){
+    //db = c->db;
+    //dict = c->db->dict;
+    //key = c->argv[1];
+    //flag = c->argrv[2];
+    //cnt = c->argv[3];
+    //val_len = c->argv[4];
+    //val = c->argv[5];
+
     int k=3, m=2, w=8;
     char **data, **coding;
     int i,j,n;
@@ -3214,29 +3227,30 @@ int erasure_encode_firstkey(dict *d, void *cnt, void *val, int keyFlag){
         memset(coding[i],0,sizeof(int)); 
     }
 
-    int len = strlen((char *)val);
+    int len = strlen((char *)c->argv[5]->ptr);
+    serverLog(LL_NOTICE, "the val is %s and val len is %d", (char *)c->argv[5]->ptr, len);
     
     if(len <= 4){
         tmpval_1 = talloc(char, sizeof(int));
-        memset(tmpval_1,0,sizeof(int)); 
+        memset(tmpval_1, 0, sizeof(int)); 
         for(n=0;  n<len; n++){
-            tmpval_1[n] = ((char*)val)[n];
+             tmpval_1[n] = ((char*)c->argv[5]->ptr)[n];
         }
-        //tmpval_1[4]='\0';
-        //serverLog(LL_NOTICE,"before the encode, the tmpval_1 is %s and the len is %d", tmpval_1, strlen(tmpval_1));
+        tmpval_1[4]='\0';
+        serverLog(LL_NOTICE,"before the encode, the tmpval_1 is %s and the len is %d", tmpval_1, strlen(tmpval_1));
 
         switch(keyFlag){
         case 0:
             memcpy(data[0], tmpval_1, sizeof(int));
-            //serverLog(LL_NOTICE,"before the encode, the data[0] is %s and the len is %d", data[0], strlen(data[0]));
+            // serverLog(LL_NOTICE,"before the encode, the data[0] is %s and the len is %d", data[0], strlen(data[0]));
             break;
         case 1:
             memcpy(data[1], tmpval_1, sizeof(int));
-            //serverLog(LL_NOTICE,"before the encode, the data[1] is %s and the len is %d", data[1], strlen(data[1]));
+            // serverLog(LL_NOTICE,"before the encode, the data[1] is %s and the len is %d", data[1], strlen(data[1]));
             break;
         case 2:
             memcpy(data[2], tmpval_1, sizeof(int));
-            //serverLog(LL_NOTICE,"before the encode, the data[2] is %s and the len is %d", data[2], strlen(data[2]));
+            // serverLog(LL_NOTICE,"before the encode, the data[2] is %s and the len is %d", data[2], strlen(data[2]));
             break;
         }
 
@@ -3255,12 +3269,12 @@ int erasure_encode_firstkey(dict *d, void *cnt, void *val, int keyFlag){
         else{
             return C_ERR;
         }
-
-        // serverLog(LL_NOTICE, "data[0]:   %02x %02x %02x %02x", (unsigned char)data[0][0], (unsigned char)data[0][1], (unsigned char)data[0][2], (unsigned char)data[0][3]);
-        // serverLog(LL_NOTICE, "data[1]:   %02x %02x %02x %02x", (unsigned char)data[1][0], (unsigned char)data[1][1], (unsigned char)data[1][2], (unsigned char)data[1][3]);
-        // serverLog(LL_NOTICE, "data[2]:   %02x %02x %02x %02x", (unsigned char)data[2][0], (unsigned char)data[2][1], (unsigned char)data[2][2], (unsigned char)data[2][3]);
-        // serverLog(LL_NOTICE, "coding[0]: %02x %02x %02x %02x", (unsigned char)coding[0][0], (unsigned char)coding[0][1], (unsigned char)coding[0][2], (unsigned char)coding[0][3]);
-        // serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
+        serverLog(LL_NOTICE, "in the erasure_encode_firstkey and len < 4: ");
+        serverLog(LL_NOTICE, "data[0]:   %02x %02x %02x %02x", (unsigned char)data[0][0], (unsigned char)data[0][1], (unsigned char)data[0][2], (unsigned char)data[0][3]);
+        serverLog(LL_NOTICE, "data[1]:   %02x %02x %02x %02x", (unsigned char)data[1][0], (unsigned char)data[1][1], (unsigned char)data[1][2], (unsigned char)data[1][3]);
+        serverLog(LL_NOTICE, "data[2]:   %02x %02x %02x %02x", (unsigned char)data[2][0], (unsigned char)data[2][1], (unsigned char)data[2][2], (unsigned char)data[2][3]);
+        serverLog(LL_NOTICE, "coding[0]: %02x %02x %02x %02x", (unsigned char)coding[0][0], (unsigned char)coding[0][1], (unsigned char)coding[0][2], (unsigned char)coding[0][3]);
+        serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
     }
 
     else{
@@ -3277,7 +3291,8 @@ int erasure_encode_firstkey(dict *d, void *cnt, void *val, int keyFlag){
         memset(tmpval_1,0,sizeof(int)*time); 
 
         for(n=0; n<time ;n++){
-            memcpy(tmpval[n], ((char*)val)+4*n, sizeof(int));
+            memcpy(tmpval[n], ((char*)c->argv[5]->ptr)+4*n, sizeof(int));
+            tmpval[n][4]='\0';
             //serverLog(LL_NOTICE,"before encode, the tmpval[n] is %s", tmpval[n]);
             switch(keyFlag){
                 case 0:
@@ -3310,23 +3325,24 @@ int erasure_encode_firstkey(dict *d, void *cnt, void *val, int keyFlag){
                 return C_ERR;
             }
             strcat(tmpval_1, tmpval[n]);
-            // serverLog(LL_NOTICE, "after encode, the tmpval_1 is %s", tmpval_1);
 
-            // serverLog(LL_NOTICE, "data[0]:   %02x %02x %02x %02x", (unsigned char)data[0][0], (unsigned char)data[0][1], (unsigned char)data[0][2], (unsigned char)data[0][3]);
-            // serverLog(LL_NOTICE, "data[1]:   %02x %02x %02x %02x", (unsigned char)data[1][0], (unsigned char)data[1][1], (unsigned char)data[1][2], (unsigned char)data[1][3]);
-            // serverLog(LL_NOTICE, "data[2]:   %02x %02x %02x %02x", (unsigned char)data[2][0], (unsigned char)data[2][1], (unsigned char)data[2][2], (unsigned char)data[2][3]);
-            // serverLog(LL_NOTICE, "coding[0]: %02x %02x %02x %02x", (unsigned char)coding[0][0], (unsigned char)coding[0][1], (unsigned char)coding[0][2], (unsigned char)coding[0][3]);
-            // serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
+            serverLog(LL_NOTICE, "in the erasure_encode_firstkey and len > 4, n=%d : ", n);
 
-            //serverLog(LL_NOTICE, "final coding[0]: %02x %02x %02x %02x", (unsigned char)tmpval[0], (unsigned char)tmpval[1], (unsigned char)tmpval[2], (unsigned char)tmpval[3]);
+            serverLog(LL_NOTICE, "data[0]:   %02x %02x %02x %02x", (unsigned char)data[0][0], (unsigned char)data[0][1], (unsigned char)data[0][2], (unsigned char)data[0][3]);
+            serverLog(LL_NOTICE, "data[1]:   %02x %02x %02x %02x", (unsigned char)data[1][0], (unsigned char)data[1][1], (unsigned char)data[1][2], (unsigned char)data[1][3]);
+            serverLog(LL_NOTICE, "data[2]:   %02x %02x %02x %02x", (unsigned char)data[2][0], (unsigned char)data[2][1], (unsigned char)data[2][2], (unsigned char)data[2][3]);
+            serverLog(LL_NOTICE, "coding[0]: %02x %02x %02x %02x", (unsigned char)coding[0][0], (unsigned char)coding[0][1], (unsigned char)coding[0][2], (unsigned char)coding[0][3]);
+            serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
+
+            serverLog(LL_NOTICE, "final coding[0]: %02x %02x %02x %02x", (unsigned char)tmpval[0], (unsigned char)tmpval[1], (unsigned char)tmpval[2], (unsigned char)tmpval[3]);
 
         }
 
-        // for(int count = 0; count < strlen(tmpval_1); count+=4){
-        //     //serverLog(LL_NOTICE, "final coding result: %02x %02x %02x %02x",
-        //      (unsigned char)tmpval_1[count], (unsigned char)tmpval_1[count+1], 
-        //      (unsigned char)tmpval_1[count+2], (unsigned char)tmpval_1[count+3]);
-        // }
+        for(int count = 0; count < strlen(tmpval_1); count+=4){
+            serverLog(LL_NOTICE, "final coding firstkey result: %02x %02x %02x %02x",
+             (unsigned char)tmpval_1[count], (unsigned char)tmpval_1[count+1], 
+             (unsigned char)tmpval_1[count+2], (unsigned char)tmpval_1[count+3]);
+        }
         
         for (i = 0; i < time; i++) {
             free(tmpval[i]); 
@@ -3335,9 +3351,16 @@ int erasure_encode_firstkey(dict *d, void *cnt, void *val, int keyFlag){
     }
 
 
-    int tmpCnt = strlen(tmpval_1);
-    serverLog(LL_NOTICE,"before dictAddParity, the cnt = %d, val = %s", tmpCnt, tmpval_1);
-    dictAddParity(d, cnt, NULL, tmpval_1, &tmpCnt);
+    char tmpLen[32];
+    ll2string(tmpLen,32,strlen(tmpval_1));
+
+    sds cntCopy = sdsdup(c->argv[3]->ptr);
+    sds valCopy = sdsnewlen(tmpval_1, strlen(tmpval_1));
+    sds lenCopy = sdsnew(tmpLen);
+
+    serverLog(LL_NOTICE,"before dictAddParity, the cnt = %s, val_len = %s, val = %s", cntCopy, lenCopy, valCopy);
+    
+    dictAddParity(server.parityDict, cntCopy, valCopy, lenCopy);
     
     for (i = 0; i < k; i++) {
         free(data[i]);
@@ -3353,21 +3376,30 @@ int erasure_encode_firstkey(dict *d, void *cnt, void *val, int keyFlag){
     return C_OK;
 }
 
-int erasure_encode_anotherkey(dict *d, void *cnt, void *val, void *val_len, int keyFlag){
-    serverLog(LL_NOTICE,"in the erasure_encode_anotherkey");
-    dictEntry *codeEntry = dictFindParity(server.parityDict, cnt);
+int erasure_encode_anotherkey(client *c, void *val_len, int keyFlag){
+    //db = c->db;
+    //dict = c->db->dict;
+    //key = c->argv[1];
+    //flag = c->argrv[2];
+    //cnt = c->argv[3];
+    //val_len = c->argv[4];
+    //val = c->argv[5];
 
-    // serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)codeEntry->stat_set_commands);
-    // serverLog(LL_NOTICE,"Entry->key: %s", (char*)codeEntry->key);
-    // serverLog(LL_NOTICE,"Entry->val: %s", (char*)codeEntry->v.val);
-    // serverLog(LL_NOTICE,"Entry->val_len: %d", *(int*)codeEntry->val_len);
+    serverLog(LL_NOTICE,"in the erasure_encode_anotherkey");
+    dictEntry *codeEntry = dictFindParity(server.parityDict, (char*)c->argv[3]->ptr);
+
+    serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)codeEntry->stat_set_commands);
+    serverLog(LL_NOTICE,"Entry->key: %s", (char*)codeEntry->key);
+    serverLog(LL_NOTICE,"Entry->val: %s", (char*)codeEntry->v.val);
+    //serverLog(LL_NOTICE,"Entry->val_len: %d", *(int*)codeEntry->val_len);
+    serverLog(LL_NOTICE,"Entry->val_len: %s", (char*)codeEntry->val_len);
 
     int len;
     if(val_len != NULL){
         len = atoi((char*)val_len);
     }
     else{
-        len = strlen((char *)val);
+        len = strlen((char *)c->argv[5]->ptr);
     }
 
     int k=3, m=2, w=8;
@@ -3393,8 +3425,9 @@ int erasure_encode_anotherkey(dict *d, void *cnt, void *val, void *val_len, int 
         tmpval_1 = talloc(char, sizeof(int));
         memset(tmpval_1,0,sizeof(int)); 
         for(n=0;  n<len; n++){
-            tmpval_1[n] = ((char*)val)[n];
+            tmpval_1[n] = ((char*)c->argv[5]->ptr)[n];
         }
+        tmpval_1[4] = '\0';
         //serverLog(LL_NOTICE,"before the encode, the tmpval_1 is %s and the len is %d", tmpval_1, strlen(tmpval_1));
 
         switch(keyFlag){
@@ -3427,11 +3460,13 @@ int erasure_encode_anotherkey(dict *d, void *cnt, void *val, void *val_len, int 
             return C_ERR;
         }
 
-        // serverLog(LL_NOTICE, "data[0]:   %02x %02x %02x %02x", (unsigned char)data[0][0], (unsigned char)data[0][1], (unsigned char)data[0][2], (unsigned char)data[0][3]);
-        // serverLog(LL_NOTICE, "data[1]:   %02x %02x %02x %02x", (unsigned char)data[1][0], (unsigned char)data[1][1], (unsigned char)data[1][2], (unsigned char)data[1][3]);
-        // serverLog(LL_NOTICE, "data[2]:   %02x %02x %02x %02x", (unsigned char)data[2][0], (unsigned char)data[2][1], (unsigned char)data[2][2], (unsigned char)data[2][3]);
-        // serverLog(LL_NOTICE, "coding[0]: %02x %02x %02x %02x", (unsigned char)coding[0][0], (unsigned char)coding[0][1], (unsigned char)coding[0][2], (unsigned char)coding[0][3]);
-        // serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
+        serverLog(LL_NOTICE, "in the erasure_encode_anotherkey and len < 4 : ");
+
+        serverLog(LL_NOTICE, "data[0]:   %02x %02x %02x %02x", (unsigned char)data[0][0], (unsigned char)data[0][1], (unsigned char)data[0][2], (unsigned char)data[0][3]);
+        serverLog(LL_NOTICE, "data[1]:   %02x %02x %02x %02x", (unsigned char)data[1][0], (unsigned char)data[1][1], (unsigned char)data[1][2], (unsigned char)data[1][3]);
+        serverLog(LL_NOTICE, "data[2]:   %02x %02x %02x %02x", (unsigned char)data[2][0], (unsigned char)data[2][1], (unsigned char)data[2][2], (unsigned char)data[2][3]);
+        serverLog(LL_NOTICE, "coding[0]: %02x %02x %02x %02x", (unsigned char)coding[0][0], (unsigned char)coding[0][1], (unsigned char)coding[0][2], (unsigned char)coding[0][3]);
+        serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
     }
 
     else{
@@ -3448,7 +3483,8 @@ int erasure_encode_anotherkey(dict *d, void *cnt, void *val, void *val_len, int 
         memset(tmpval_1,0,sizeof(int)*time); 
 
         for(n=0; n<time; n++){
-            memcpy(tmpval[n], ((char*)val)+4*n, sizeof(int));
+            memcpy(tmpval[n], ((char*)c->argv[5]->ptr)+4*n, sizeof(int));
+            tmpval[n][4]='\0';
             //serverLog(LL_NOTICE,"before encode, the tmpval[n] is %s", tmpval[n]);
             switch(keyFlag){
                 case 0:
@@ -3480,19 +3516,20 @@ int erasure_encode_anotherkey(dict *d, void *cnt, void *val, void *val_len, int 
             }
             strcat(tmpval_1, tmpval[n]);
             //serverLog(LL_NOTICE, "after encode, the tmpval_1 is %s", tmpval_1);
-        
-        
-            // serverLog(LL_NOTICE, "data[0]:   %02x %02x %02x %02x", (unsigned char)data[0][0], (unsigned char)data[0][1], (unsigned char)data[0][2], (unsigned char)data[0][3]);
-            // serverLog(LL_NOTICE, "data[1]:   %02x %02x %02x %02x", (unsigned char)data[1][0], (unsigned char)data[1][1], (unsigned char)data[1][2], (unsigned char)data[1][3]);
-            // serverLog(LL_NOTICE, "data[2]:   %02x %02x %02x %02x", (unsigned char)data[2][0], (unsigned char)data[2][1], (unsigned char)data[2][2], (unsigned char)data[2][3]);
-            // serverLog(LL_NOTICE, "coding[0]: %02x %02x %02x %02x", (unsigned char)coding[0][0], (unsigned char)coding[0][1], (unsigned char)coding[0][2], (unsigned char)coding[0][3]);
-            // serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
 
-            //serverLog(LL_NOTICE, "final coding[0]: %02x %02x %02x %02x", (unsigned char)tmpval[0], (unsigned char)tmpval[1], (unsigned char)tmpval[2], (unsigned char)tmpval[3]);
+            serverLog(LL_NOTICE, "in the erasure_encode_anotherkey and len > 4, n=%d : ", n);        
+        
+            serverLog(LL_NOTICE, "data[0]:   %02x %02x %02x %02x", (unsigned char)data[0][0], (unsigned char)data[0][1], (unsigned char)data[0][2], (unsigned char)data[0][3]);
+            serverLog(LL_NOTICE, "data[1]:   %02x %02x %02x %02x", (unsigned char)data[1][0], (unsigned char)data[1][1], (unsigned char)data[1][2], (unsigned char)data[1][3]);
+            serverLog(LL_NOTICE, "data[2]:   %02x %02x %02x %02x", (unsigned char)data[2][0], (unsigned char)data[2][1], (unsigned char)data[2][2], (unsigned char)data[2][3]);
+            serverLog(LL_NOTICE, "coding[0]: %02x %02x %02x %02x", (unsigned char)coding[0][0], (unsigned char)coding[0][1], (unsigned char)coding[0][2], (unsigned char)coding[0][3]);
+            serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
+
+            serverLog(LL_NOTICE, "final coding[0]: %02x %02x %02x %02x", (unsigned char)tmpval[0], (unsigned char)tmpval[1], (unsigned char)tmpval[2], (unsigned char)tmpval[3]);
         }
 
         for(int count = 0; count < sizeof(int)*time; count+=4){
-            serverLog(LL_NOTICE, "final coding result: %02x %02x %02x %02x",
+            serverLog(LL_NOTICE, "final coding anotherkey result: %02x %02x %02x %02x",
              (unsigned char)tmpval_1[count], (unsigned char)tmpval_1[count+1], 
              (unsigned char)tmpval_1[count+2], (unsigned char)tmpval_1[count+3]);
         }
@@ -3503,7 +3540,7 @@ int erasure_encode_anotherkey(dict *d, void *cnt, void *val, void *val_len, int 
     }
 
     // 校验Value
-    int lenValOld = *(int*)codeEntry->val_len;
+    int lenValOld = atoi((char*)codeEntry->val_len);
     int lenValNew = len;
     serverLog(LL_NOTICE,"the lenValOld = %d, the lenValNew = %d", lenValOld, lenValNew);
 
@@ -3518,25 +3555,25 @@ int erasure_encode_anotherkey(dict *d, void *cnt, void *val, void *val_len, int 
     for(int i = 0; i < lenValNew; i++){
         tmpValue[i] ^= tmpval_1[i];
     }
+    tmpValue[lenvaltmp] = '\0';
 
     serverLog(LL_NOTICE,"before Set Parity Val, the tmpValue is %s",tmpValue);
+
+    char tmpLen[32];
+    ll2string(tmpLen, 32, lenvaltmp);
+
+    //sds cntCopy = sdsdup(c->argv[3]->ptr);
+    sds valCopy = sdsnewlen(tmpValue, lenvaltmp);
+    sds lenCopy = sdsnew(tmpLen);
+
     // 设置新的val
-    dictSetVal(d, codeEntry, tmpValue);
+    dictSetVal(server.parityDict, codeEntry, valCopy);
     //serverLog(LL_NOTICE,"after Set Parity Val, the NewValue is %s",(char *)codeEntry->v.val);
 
-    //for(int count = 0; count < lenvaltmp; count+=4){
-        //serverLog(LL_NOTICE, "final coding result: %02x %02x %02x %02x",
-        //    (unsigned char)tmpValue[count], (unsigned char)tmpValue[count+1], 
-        //    (unsigned char)tmpValue[count+2], (unsigned char)tmpValue[count+3]);
-    //}
-
     // 设置新的val_len
-    // int * tmpValLen = (int *)malloc(lenvaltmp*sizeof(int));
-    // memset(tmpValLen,0,lenvaltmp*sizeof(int));
-    // * tmpValLen = lenvaltmp;
     // serverLog(LL_NOTICE,"before dictSetLen, the val_len/lenvaltmp = %d", lenvaltmp);
     // serverLog(LL_NOTICE,"before dictSetLen, the val_len/tmpValLen = %d", *tmpValLen);
-    dictSetLen(d, codeEntry, &lenvaltmp);
+    dictSetLen(server.parityDict, codeEntry, lenCopy);
 
     free(tmpValue);
     //free(tmpValLen);

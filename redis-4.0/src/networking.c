@@ -1373,8 +1373,8 @@ void processInputBuffer(client *c) {
                 c->reqtype = PROTO_REQ_INLINE;
             }
         }
-        serverLog(LL_NOTICE,"before processMultibulkBuffer");
-        serverLog(LL_NOTICE,"the c->querybuf is %s", c->querybuf);
+        // serverLog(LL_NOTICE,"before processMultibulkBuffer");
+        // serverLog(LL_NOTICE,"the c->querybuf is %s", c->querybuf);
         if (c->reqtype == PROTO_REQ_INLINE) {
             if (processInlineBuffer(c) != C_OK) break;
         } else if (c->reqtype == PROTO_REQ_MULTIBULK) {
@@ -1382,7 +1382,7 @@ void processInputBuffer(client *c) {
         } else {
             serverPanic("Unknown request type");
         }
-        serverLog(LL_NOTICE,"after processMultibulkBuffer");
+        // serverLog(LL_NOTICE,"after processMultibulkBuffer");
 
 # ifdef _ERASURE_CODE_
 #include "parity.h"
@@ -1442,10 +1442,6 @@ void processInputBuffer(client *c) {
 
             case PARITY_READ_BUFFER_AND_ENCODE: 
                 serverLog(LL_NOTICE,"this is networking's PARITY_READ_BUFFER_AND_ENCODE, and the flag is %d", e[0] - '0');
-                
-                // struct timespec t1 = {0, 0};
-                // struct timespec t2 = {0, 0};
-                // clock_gettime(CLOCK_REALTIME, &t1);
 
                 server.testStr=(char*)(c -> argv[5] -> ptr);
                 server.testStrLen = atoi((char*)(getDecodedObject(c -> argv[4]) -> ptr));
@@ -1474,7 +1470,8 @@ void processInputBuffer(client *c) {
                         serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmp->stat_set_commands);
                         serverLog(LL_NOTICE,"Entry->key: %s", (char*)tmp->key);
                         serverLog(LL_NOTICE,"Entry->val: %s", (char*)tmp->v.val);
-                        serverLog(LL_NOTICE,"Entry->val_len: %d", *(int*)tmp->val_len);
+                        //serverLog(LL_NOTICE,"Entry->val_len: %d", *(int*)tmp->val_len);
+                        serverLog(LL_NOTICE,"Entry->val_len: %s", (char*)tmp->val_len);
 
                         robj *replyOK = createObject(OBJ_STRING,sdsnew("+OK\r\n"));
                         addReply(c, replyOK); 

@@ -205,6 +205,7 @@ int dictExpand(dict *d, unsigned long size)
  * will visit at max N*10 empty buckets in total, otherwise the amount of
  * work it does would be unbound and the function may block for a long time. */
 int dictRehash(dict *d, int n) {
+    serverLog(LL_NOTICE, "in the dictRehash");
     int empty_visits = n*10; /* Max number of empty buckets to visit. */
     if (!dictIsRehashing(d)) return 0;
 
@@ -249,6 +250,54 @@ int dictRehash(dict *d, int n) {
     return 1;
 }
 
+#ifdef _ERASURE_CODE_
+int dictRehashParity(dict *d, int n) {
+    serverLog(LL_NOTICE, "in the dictRehashParity");
+    int empty_visits = n*10; /* Max number of empty buckets to visit. */
+    if (!dictIsRehashing(d)) return 0;
+
+    while(n-- && d->ht[0].used != 0) {
+        dictEntry *de, *nextde;
+
+        /* Note that rehashidx can't overflow as we are sure there are more
+         * elements because ht[0].used != 0 */
+        assert(d->ht[0].size > (unsigned long)d->rehashidx);
+        while(d->ht[0].table[d->rehashidx] == NULL) {
+            d->rehashidx++;
+            if (--empty_visits == 0) return 1;
+        }
+        de = d->ht[0].table[d->rehashidx];
+        /* Move all the keys in this bucket from the old to the new hash HT */
+        while(de) {
+            uint64_t h;
+
+            nextde = de->next;
+            /* Get the index in the new hash table */
+            h = dictHashKey(d, de->stat_set_commands) & d->ht[1].sizemask;
+            de->next = d->ht[1].table[h];
+            d->ht[1].table[h] = de;
+            d->ht[0].used--;
+            d->ht[1].used++;
+            de = nextde;
+        }
+        d->ht[0].table[d->rehashidx] = NULL;
+        d->rehashidx++;
+    }
+
+    /* Check if we already rehashed the whole table... */
+    if (d->ht[0].used == 0) {
+        zfree(d->ht[0].table);
+        d->ht[0] = d->ht[1];
+        _dictReset(&d->ht[1]);
+        d->rehashidx = -1;
+        return 0;
+    }
+
+    /* More to rehash... */
+    return 1;
+}
+#endif
+
 long long timeInMilliseconds(void) {
     struct timeval tv;
 
@@ -277,8 +326,16 @@ int dictRehashMilliseconds(dict *d, int ms) {
  * dictionary so that the hash table automatically migrates from H1 to H2
  * while it is actively used. */
 static void _dictRehashStep(dict *d) {
+    serverLog(LL_NOTICE, "in the _dictRehashStep");
     if (d->iterators == 0) dictRehash(d,1);
 }
+
+#ifdef _ERASURE_CODE_
+static void _dictRehashStepParity(dict *d) {
+    serverLog(LL_NOTICE, "in the _dictRehashStepParity");
+    if (d->iterators == 0) dictRehashParity(d,1);
+}
+#endif
 
 /* Add an element to the target hash table */
 int dictAdd(dict *d, void *key, void *val)
@@ -362,20 +419,17 @@ int dictAddCntKey(dict* d, void* cnt, void* key1, void *key2, void *key3){
     return DICT_OK;
 }
 
-int dictAddParity(dict *d, void *cnt, void *key, void *val, void *len){
+int dictAddParity(dict *d, void *cnt, void *val, void *len){
     dictEntry *entry = dictAddRawParity(d,cnt,NULL);  
 
-    //serverLog(LL_NOTICE,"in the dictAddParity, the entry->cnt is %s", (char *)entry->stat_set_commands);
+    serverLog(LL_NOTICE,"in the dictAddParity, the entry->cnt is %s", (char *)entry->stat_set_commands);
 
     if (!entry) return DICT_ERR;
-
-    //serverLog(LL_NOTICE,"in the dictAddParity before, the entry->key is %s", (char *)key);
-    dictSetKey(d, entry, key);
-    //serverLog(LL_NOTICE,"in the dictAddParity after, the entry->key is %s", (char *)entry->key);
 
     //serverLog(LL_NOTICE,"in the dictAddParity before, the entry->val is %s", (char *)val);
     dictSetVal(d, entry, val);
     //serverLog(LL_NOTICE,"in the dictAddParity after, the entry->val is %s", (char *)entry->v.val);
+    dictSetKey(d, entry, NULL);
 
     dictSetLen(d, entry, len);
 
@@ -458,14 +512,14 @@ dictEntry *dictAddRawParity(dict *d, void *cnt, dictEntry **existing){
     dictEntry *entry;
     dictht *ht;
 
-    //serverLog(LL_NOTICE,"in the dictAddRawParity, before ReHash");
+    serverLog(LL_NOTICE,"in the dictAddRawParity, before ReHash");
 
-    //if (dictIsRehashing(d)) _dictRehashStep(d);
+    if (dictIsRehashing(d)) _dictRehashStepParity(d);
 
     /* Get the index of the new element, or -1 if
      * the element already exists. */
     if ((index = _dictKeyIndexParity(d, cnt, dictHashKey(d,cnt), existing)) == -1){
-        //serverLog(LL_NOTICE,"in the dictAddRawParity, the element already exists");
+        serverLog(LL_NOTICE,"in the dictAddRawParity, the element already exists");
         return NULL;
     }
 
@@ -871,44 +925,26 @@ dictEntry *dictFind(dict *d, const void *key)
 #ifdef _ERASURE_CODE_
 dictEntry *dictFindParity(dict *d, const void *cnt){
     //serverLog(LL_NOTICE,"in the dictFindParity");
+
     dictEntry *he;
     uint64_t h, idx, table;
 
-    //serverLog(LL_NOTICE,"in the dictFindParity, before test");
-    if (d->ht[0].used + d->ht[1].used == 0) {
-        //serverLog(LL_NOTICE,"in the dictFindParity, d->ht[0].used + d->ht[1].used == 0");
-        return NULL; /* dict is empty */
-    }
-    //serverLog(LL_NOTICE,"in the dictFindParity, after test");
-
-    //serverLog(LL_NOTICE,"in the dictFindParity, before dicthashkey");
-    //if (dictIsRehashing(d)) _dictRehashStep(d);
-    //serverLog(LL_NOTICE,"in the dictFindParity, inter dicthashkey");
+    if (d->ht[0].used + d->ht[1].used == 0) return NULL; /* dict is empty */
+    if (dictIsRehashing(d)) _dictRehashStepParity(d);
     h = dictHashKey(d, cnt);
-    //serverLog(LL_NOTICE,"in the dictFindParity, h = %d", h);
-
     for (table = 0; table <= 1; table++) {
         idx = h & d->ht[table].sizemask;
-        //serverLog(LL_NOTICE,"in the dictFindParity, idx = %d", idx);
         he = d->ht[table].table[idx];
-        if(he == NULL){
-            //serverLog(LL_NOTICE,"in the dictFindParity, he is NULL");
-        }else{
-            //serverLog(LL_NOTICE,"in the dictFindParity, before the while(he), the he->stat_set_commands is %s", (char *)he->stat_set_commands);
-        }        
         while(he) {
-            // serverLog(LL_NOTICE,"in the dictFindParity, the cnt is %s", (char *)cnt);
-            // serverLog(LL_NOTICE,"in the dictFindParity, the he->stat_set_commands is %s", (char *)he->stat_set_commands);
             if (cnt==he->stat_set_commands || dictCompareKeys(d, cnt, he->stat_set_commands)){
-                // serverLog(LL_NOTICE,"in the dictFindParity and while(he), find the he");
                 return he;
             }  
-            // serverLog(LL_NOTICE,"in the dictFindParity and while(he), didn't find the he");
             he = he->next;
         }
         if (!dictIsRehashing(d)) return NULL;
     }
     return NULL;
+
 }
 #endif
 
@@ -1404,6 +1440,7 @@ static long _dictKeyIndex(dict *d, const void *key, uint64_t hash, dictEntry **e
 #ifdef _ERASURE_CODE_
 static long _dictKeyIndexParity(dict *d, const void *cnt, uint64_t hash, dictEntry **existing)
 {
+    serverLog(LL_NOTICE, "trace 3, the copy is %s, in the _dictKeyIndexParity", cnt);
     unsigned long idx, table;
     dictEntry *he;
     if (existing) *existing = NULL;

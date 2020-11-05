@@ -211,7 +211,7 @@ endif
 
 # redis-server
 $(REDIS_SERVER_NAME): $(REDIS_SERVER_OBJ)
-	$(REDIS_LD) -o $@ $^ ../deps/hiredis/libhiredis.a ../deps/Jerasure-1.2/reed_sol.o ../deps/Jerasure-1.2/galois.o ../deps/Jerasure-1.2/jerasure.o ../deps/lua/src/liblua.a $(FINAL_LIBS)
+	$(REDIS_LD) -o $@ $^ ../deps/hiredis/libhiredis.a /usr/lib/libevent.a ../deps/Jerasure-1.2/reed_sol.o ../deps/Jerasure-1.2/galois.o ../deps/Jerasure-1.2/jerasure.o ../deps/lua/src/liblua.a $(FINAL_LIBS)
 
 # redis-sentinel
 $(REDIS_SENTINEL_NAME): $(REDIS_SERVER_NAME)

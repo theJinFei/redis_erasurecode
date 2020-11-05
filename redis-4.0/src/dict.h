@@ -179,11 +179,14 @@ int dictAdd(dict *d, void *key, void *val);
 
 int dictAddKeyCnt(dict* d, void* key, void* cnt);
 int dictAddCntKey(dict* d, void* cnt, void* key1, void *key2, void *key3);
-int dictAddParity(dict *d, void *cnt, void *key, void *val, void *len);
+int dictAddParity(dict *d, void *cnt, void *val, void *len);
 dictEntry *dictAddRawParity(dict *d, void *cnt, dictEntry **existing);
 dictEntry *dictFindParity(dict *d, const void *cnt);
 int dictReplaceParity(dict *d, void *cnt, void *key, void *val, void *len, int flag);
 int dictAddRecovery(dict *d, void *key, void *val, void *cnt);
+
+int dictRehashParity(dict *d, int n);
+
 # endif
 
 dictEntry *dictAddRaw(dict *d, void *key, dictEntry **existing);
