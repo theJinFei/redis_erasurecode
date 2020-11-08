@@ -2652,16 +2652,16 @@ void insertKeyCntDict(client* c)
     if (dictFind(server.KeyCntDict, c->argv[1]->ptr) == NULL) {
         //全新的key 
         //serverLog(LL_NOTICE,"the KeyCntDict is NULL and insertKeyCntDict");
+        
         sds copy = sdsdup(c -> argv[1] -> ptr);
-
         int retval = dictAddKeyCnt(server.KeyCntDict, copy, c -> argv[3] -> ptr);
 
-        dictEntry *tmp = dictFind(server.KeyCntDict,c->argv[1]->ptr);
-        if(tmp!=NULL){
-            serverLog(LL_NOTICE,"the insertKeyCntDict successfully ...");
-            serverLog(LL_NOTICE,"Entry->key: %s", (char*)tmp->key);
-            serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmp->stat_set_commands);  
-        }
+        // dictEntry *tmp = dictFind(server.KeyCntDict,c->argv[1]->ptr);
+        // if(tmp!=NULL){
+        //     serverLog(LL_NOTICE,"the insertKeyCntDict successfully ...");
+        //     serverLog(LL_NOTICE,"Entry->key: %s", (char*)tmp->key);
+        //     serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmp->stat_set_commands);  
+        // }
     
     } else {
         //已经有过的key
@@ -2748,11 +2748,11 @@ int processEncodeCommand(client *c, int keyFlag){
 
 int processUpdateParityCommand(client *c){
     serverLog(LL_NOTICE,"in the processUpdateParityCommand");
-    int j;
-    for(j = 0; j < c -> argc; j++){
-        robj* o = c -> argv[j];
-        //serverLog(LL_NOTICE,"int the processUpdateParityCommand, the obj is %s", (char*)(o -> ptr));
-    }
+    // int j;
+    // for(j = 0; j < c -> argc; j++){
+    //     robj* o = c -> argv[j];
+    //     //serverLog(LL_NOTICE,"int the processUpdateParityCommand, the obj is %s", (char*)(o -> ptr));
+    // }
 
     //db = c->db;
     //dict = c->db->dict;
@@ -2807,7 +2807,7 @@ int processUpdateParityCommand(client *c){
 
         //serverLog(LL_NOTICE, "before updateParity, the flag is %d", flag);
 
-        sds copy = sdsdup(c->argv[3]->ptr);
+        // sds copy = sdsdup(c->argv[3]->ptr);
         erasure_encode_anotherkey(c, c->argv[4]->ptr, flag);
     }
     return C_OK;
@@ -5038,7 +5038,7 @@ int main(int argc, char **argv) {
             //child7002
             int msgport = 7002;
             serverLog(LL_NOTICE, "in the pid7002");
-            if(feedParityPipelineAll(msgport) == C_OK){
+            if(feedParityAsyncAll(msgport) == C_OK){
                 exitFromChild(0);
             }
             else{
@@ -5050,7 +5050,7 @@ int main(int argc, char **argv) {
                 //child7003
                 int msgport = 7003;
                 serverLog(LL_NOTICE, "in the pid7003");
-                if(feedParityPipelineAll(msgport) == C_OK){
+                if(feedParityAsyncAll(msgport) == C_OK){
                     exitFromChild(0);
                 }
                 else{

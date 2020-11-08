@@ -205,7 +205,7 @@ int dictExpand(dict *d, unsigned long size)
  * will visit at max N*10 empty buckets in total, otherwise the amount of
  * work it does would be unbound and the function may block for a long time. */
 int dictRehash(dict *d, int n) {
-    serverLog(LL_NOTICE, "in the dictRehash");
+    // serverLog(LL_NOTICE, "in the dictRehash");
     int empty_visits = n*10; /* Max number of empty buckets to visit. */
     if (!dictIsRehashing(d)) return 0;
 
@@ -252,7 +252,7 @@ int dictRehash(dict *d, int n) {
 
 #ifdef _ERASURE_CODE_
 int dictRehashParity(dict *d, int n) {
-    serverLog(LL_NOTICE, "in the dictRehashParity");
+    // serverLog(LL_NOTICE, "in the dictRehashParity");
     int empty_visits = n*10; /* Max number of empty buckets to visit. */
     if (!dictIsRehashing(d)) return 0;
 
@@ -326,13 +326,13 @@ int dictRehashMilliseconds(dict *d, int ms) {
  * dictionary so that the hash table automatically migrates from H1 to H2
  * while it is actively used. */
 static void _dictRehashStep(dict *d) {
-    serverLog(LL_NOTICE, "in the _dictRehashStep");
+    // serverLog(LL_NOTICE, "in the _dictRehashStep");
     if (d->iterators == 0) dictRehash(d,1);
 }
 
 #ifdef _ERASURE_CODE_
 static void _dictRehashStepParity(dict *d) {
-    serverLog(LL_NOTICE, "in the _dictRehashStepParity");
+    // serverLog(LL_NOTICE, "in the _dictRehashStepParity");
     if (d->iterators == 0) dictRehashParity(d,1);
 }
 #endif

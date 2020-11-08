@@ -1198,22 +1198,22 @@ static void setProtocolError(const char *errstr, client *c, long pos) {
  * command is in RESP format, so the first byte in the command is found
  * to be '*'. Otherwise for inline commands processInlineBuffer() is called. */
 int processMultibulkBuffer(client *c) {
-    serverLog(LL_NOTICE,"in the processMultibulkBuffer");
+    // serverLog(LL_NOTICE,"in the processMultibulkBuffer");
     char *newline = NULL;
     long pos = 0;
     int ok;
     long long ll;
 
     if (c->multibulklen == 0) {
-        serverLog(LL_NOTICE,"c->multibulklen == 0");
-        serverLog(LL_NOTICE,"c->argc = %d", c->argc);
-        for(int i = 0; i < c -> argc; i++){
-            robj* o = getDecodedObject(c -> argv[i]);
-            serverLog(LL_NOTICE,"in the processMultibulkBuffer, o -> ptr is %s", (char *)(o -> ptr));
-        }
+        // serverLog(LL_NOTICE,"c->multibulklen == 0");
+        // serverLog(LL_NOTICE,"c->argc = %d", c->argc);
+        // for(int i = 0; i < c -> argc; i++){
+        //     robj* o = getDecodedObject(c -> argv[i]);
+        //     serverLog(LL_NOTICE,"in the processMultibulkBuffer, o -> ptr is %s", (char *)(o -> ptr));
+        // }
         /* The client should have been reset */
         serverAssertWithInfo(c,NULL,c->argc == 0);
-        serverLog(LL_NOTICE,"after serverAssertWithInfo");
+        // serverLog(LL_NOTICE,"after serverAssertWithInfo");
 
         /* Multi bulk length cannot be read without a \r\n */
         newline = strchr(c->querybuf,'\r');
@@ -1422,10 +1422,10 @@ void processInputBuffer(client *c) {
                 !strcmp((char *)(c -> argv[2] -> ptr), "5") )){     // 增加槽 也会走这个if条件 需要判断第一个是不是SET
 
             // set key flag cnt len pairtyXOR
-            for(int i = 0; i < c -> argc; i++){
-                robj* o = getDecodedObject(c -> argv[i]);
-                serverLog(LL_NOTICE,"before the switch-case, o -> ptr is %s", (char *)(o -> ptr));
-            }
+            // for(int i = 0; i < c -> argc; i++){
+            //     robj* o = getDecodedObject(c -> argv[i]);
+            //     serverLog(LL_NOTICE,"before the switch-case, o -> ptr is %s", (char *)(o -> ptr));
+            // }
 
             // flag
             char* e = (char *)(getDecodedObject(c -> argv[2]) -> ptr);
@@ -1443,8 +1443,8 @@ void processInputBuffer(client *c) {
             case PARITY_READ_BUFFER_AND_ENCODE: 
                 serverLog(LL_NOTICE,"this is networking's PARITY_READ_BUFFER_AND_ENCODE, and the flag is %d", e[0] - '0');
 
-                server.testStr=(char*)(c -> argv[5] -> ptr);
-                server.testStrLen = atoi((char*)(getDecodedObject(c -> argv[4]) -> ptr));
+                // server.testStr=(char*)(c -> argv[5] -> ptr);
+                // server.testStrLen = atoi((char*)(getDecodedObject(c -> argv[4]) -> ptr));
                 // serverLog(LL_NOTICE,"in the PARITY_READ_BUFFER_AND_ENCODE, and the server.testStr is %s", server.testStr);
                 
                 // addReplyBulk(c,c->argv[5]); 
@@ -1452,13 +1452,13 @@ void processInputBuffer(client *c) {
                 insertKeyCntDict(c);//更新key和cnt的hash表
 
                 int keyFlag = insertCntKeyDict(c);//更新cnt和key的hash表
-                serverLog(LL_NOTICE, "the keyFlag is %d", keyFlag);
-                serverLog(LL_NOTICE,"the insertCntKeyDict successfully ...");
-                tmp = dictFindParity(server.CntKeyDict, c->argv[3]->ptr);
-                serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmp->stat_set_commands);
-                serverLog(LL_NOTICE,"Entry->key1: %s", (char*)tmp->key);
-                serverLog(LL_NOTICE,"Entry->key2: %s", (char*)tmp->v.val);
-                serverLog(LL_NOTICE,"Entry->key3: %s", (char*)tmp->val_len); 
+                // serverLog(LL_NOTICE, "the keyFlag is %d", keyFlag);
+                // serverLog(LL_NOTICE,"the insertCntKeyDict successfully ...");
+                // tmp = dictFindParity(server.CntKeyDict, c->argv[3]->ptr);
+                // serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmp->stat_set_commands);
+                // serverLog(LL_NOTICE,"Entry->key1: %s", (char*)tmp->key);
+                // serverLog(LL_NOTICE,"Entry->key2: %s", (char*)tmp->v.val);
+                // serverLog(LL_NOTICE,"Entry->key3: %s", (char*)tmp->val_len); 
 
                 if (processEncodeCommand(c, keyFlag) != C_OK){
                     serverLog(LL_NOTICE,"Process Encode error in processEncodeCommand");
@@ -1476,6 +1476,7 @@ void processInputBuffer(client *c) {
                         robj *replyOK = createObject(OBJ_STRING,sdsnew("+OK\r\n"));
                         addReply(c, replyOK); 
                         serverLog(LL_NOTICE, "after addReply, the reply is %s", (char *)replyOK->ptr);
+                        decrRefCount(replyOK);
                         parity_flag = 1;
                     }
                     else{
@@ -1486,13 +1487,6 @@ void processInputBuffer(client *c) {
                         resetClient(c);
                     } 
                 }
-                // clock_gettime(CLOCK_REALTIME, &t2);
-                // double sec=t2.tv_sec - t1.tv_sec;
-                // double nsec=t2.tv_nsec - t1.tv_nsec;
-                // sec=sec+nsec/1000000000;
-                // serverLog(LL_NOTICE,"erasure_encode_firstkey, time = %f", sec);
-                // server.totalSec += sec;
-                // serverLog(LL_NOTICE,"erasure_encode_firstkey, server.totalSec = %f", server.totalSec);
                 break;
             case PARITY_READ_BUFFER_AND_UPDATE: 
             {
@@ -1512,6 +1506,7 @@ void processInputBuffer(client *c) {
                         robj *replyOK = createObject(OBJ_STRING,sdsnew("+OK\r\n"));
                         addReply(c, replyOK); 
                         serverLog(LL_NOTICE, "after addReply, the reply is %s", (char *)replyOK->ptr);
+                        decrRefCount(replyOK);
                         parity_flag = 1;
                     }
                     else{
@@ -1544,6 +1539,7 @@ void processInputBuffer(client *c) {
                 robj *val = dictGetVal(tmp);
                 addReplyBulkCString(c, (char *)(getDecodedObject(val) -> ptr));
                 // serverLog(LL_NOTICE,"the 7001.value is %s", (char *)(getDecodedObject(val) -> ptr));
+                decrRefCount(val);
 
                 parity_flag = 1;
                 break;

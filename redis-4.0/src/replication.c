@@ -431,7 +431,7 @@ void feedParityARGV(client *cl, const int argc, robj** argv){
     //     }
 
     // }
-    // free(sendStr);
+    free(sendStr);
 }
 
 void feedParityXORLen(client *cl, const char* key, const char* parityXOR, int len){
@@ -565,7 +565,7 @@ void feedParityXORLen(client *cl, const char* key, const char* parityXOR, int le
     //     }
 
     // }
-    // sdsfree(sendStr);
+    sdsfree(sendStr);
 }
 
 int feedParityAll(int port){
@@ -657,6 +657,9 @@ int feedParityPipelineAll(int port){
             redisFree(c);
         }
     }
+    free(parityip);
+    freeReplyObject(reply);
+
     return C_OK;
 }
 
