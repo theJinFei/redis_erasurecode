@@ -1410,6 +1410,18 @@ void processInputBuffer(client *c) {
 
         }
 
+        if(strcmp((char *)(c -> argv[0] -> ptr), "consumption") == 0){
+            serverLog(LL_NOTICE,"before processConsumption");
+            if(processConsumption(c) == C_OK){
+                serverLog(LL_NOTICE,"processConsumption is OK");
+                // parity_flag = 1;
+            }
+            else{
+                serverLog(LL_NOTICE,"Error: processConsumption is error");
+            }
+
+        }
+
 
         // 这个时候 其实命令就已经解析出来了
         // 如果解析的命令中包含的flag是parity定义的类型的话
@@ -1453,12 +1465,12 @@ void processInputBuffer(client *c) {
 
                 int keyFlag = insertCntKeyDict(c);//更新cnt和key的hash表
                 // serverLog(LL_NOTICE, "the keyFlag is %d", keyFlag);
-                // serverLog(LL_NOTICE,"the insertCntKeyDict successfully ...");
-                // tmp = dictFindParity(server.CntKeyDict, c->argv[3]->ptr);
-                // serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmp->stat_set_commands);
-                // serverLog(LL_NOTICE,"Entry->key1: %s", (char*)tmp->key);
-                // serverLog(LL_NOTICE,"Entry->key2: %s", (char*)tmp->v.val);
-                // serverLog(LL_NOTICE,"Entry->key3: %s", (char*)tmp->val_len); 
+                serverLog(LL_NOTICE,"the insertCntKeyDict successfully ...");
+                tmp = dictFindParity(server.CntKeyDict, c->argv[3]->ptr);
+                serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmp->stat_set_commands);
+                serverLog(LL_NOTICE,"Entry->key1: %s", (char*)tmp->key);
+                serverLog(LL_NOTICE,"Entry->key2: %s", (char*)tmp->v.val);
+                serverLog(LL_NOTICE,"Entry->key3: %s", (char*)tmp->val_len); 
 
                 if (processEncodeCommand(c, keyFlag) != C_OK){
                     serverLog(LL_NOTICE,"Process Encode error in processEncodeCommand");

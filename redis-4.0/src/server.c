@@ -530,7 +530,6 @@ uint64_t dictObjHash(const void *key) {
 }
 
 uint64_t dictSdsHash(const void *key) {
-    serverLog(LL_NOTICE,"in the dictSdsHash, and the key is %s", key);
     return dictGenHashFunction((unsigned char*)key, sdslen((char*)key));
 }
 
@@ -2654,14 +2653,15 @@ void insertKeyCntDict(client* c)
         //serverLog(LL_NOTICE,"the KeyCntDict is NULL and insertKeyCntDict");
         
         sds copy = sdsdup(c -> argv[1] -> ptr);
-        int retval = dictAddKeyCnt(server.KeyCntDict, copy, c -> argv[3] -> ptr);
+        sds copycnt = sdsdup(c->argv[3]->ptr);
+        int retval = dictAddKeyCnt(server.KeyCntDict, copy, copycnt);
 
-        // dictEntry *tmp = dictFind(server.KeyCntDict,c->argv[1]->ptr);
-        // if(tmp!=NULL){
-        //     serverLog(LL_NOTICE,"the insertKeyCntDict successfully ...");
-        //     serverLog(LL_NOTICE,"Entry->key: %s", (char*)tmp->key);
-        //     serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmp->stat_set_commands);  
-        // }
+        dictEntry *tmp = dictFind(server.KeyCntDict,c->argv[1]->ptr);
+        if(tmp!=NULL){
+            serverLog(LL_NOTICE,"the insertKeyCntDict successfully ...");
+            serverLog(LL_NOTICE,"Entry->key: %s", (char*)tmp->key);
+            serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmp->stat_set_commands);  
+        }
     
     } else {
         //已经有过的key
@@ -2674,18 +2674,19 @@ int insertCntKeyDict(client* c){
     // robj* cnt = c -> argv[3];
     // robj* len = c -> argv[4];
     sds copy = sdsdup(c->argv[3]->ptr);
+    sds copykey = sdsdup(c->argv[1]->ptr);
     int tmpPort = atoi((char*)c -> argv[4]->ptr);
 
     if(tmpPort == 7000){
-        dictAddCntKey(server.CntKeyDict, copy, c->argv[1]->ptr, NULL, NULL);
+        dictAddCntKey(server.CntKeyDict, copy, copykey, NULL, NULL);
         return 0;
     }
     else if(tmpPort == 7001){
-        dictAddCntKey(server.CntKeyDict, copy, NULL, c->argv[1]->ptr, NULL);
+        dictAddCntKey(server.CntKeyDict, copy, NULL, copykey, NULL);
         return 1;
     }
     else if(tmpPort == 7004){
-        dictAddCntKey(server.CntKeyDict, copy, NULL, NULL, c->argv[1]->ptr);
+        dictAddCntKey(server.CntKeyDict, copy, NULL, NULL, copykey);
         return 2;
     }
     else{
@@ -2820,13 +2821,13 @@ int processReplyGet(client *c){
     //dictEntry *de = dictFindParity(server.parityDict, tmp->stat_set_commands);
     if(de){
         //找到，直接回复value
-        //serverLog(LL_NOTICE,"find the key in the server.db->dict, and return value directly");
+        serverLog(LL_NOTICE,"find the key in the server.db->dict, and return value directly");
         addReplyBulkCString(c, (char*)de->v.val);
         return C_OK;
     }
     else{
         //没找到，通知其他数据结点开始恢复
-        //serverLog(LL_NOTICE,"didn't find the key in the server.db->dict, need to recovery");
+        serverLog(LL_NOTICE,"didn't find the key in the server.db->dict, need to recovery");
         //addReplyBulkCString(c, "in the process of recovery...");
         if(processRecoverySignalData(c)==C_OK){
             return C_OK;
@@ -2841,11 +2842,26 @@ int processRecoverySignalData(client *c){
     const char* parityip = "127.0.0.1";
     int port = 7001;
 
+    serverLog(LL_NOTICE, "the recovery key is %s", (char*)c->argv[1]->ptr);
+
     dictEntry *tmpCnt = dictFind(server.KeyCntDict, c->argv[1]->ptr);
-    //serverLog(LL_NOTICE, "in the processRecoverySignalData, the tmpCnt = %s", (char *)tmpCnt->stat_set_commands);
+    serverLog(LL_NOTICE, "in the processRecoverySignalData, the tmpCnt = %s", (char *)tmpCnt->stat_set_commands);
+
+    // dictIterator *di;
+    // dictEntry *de;
+    // di = dictGetSafeIterator(server.KeyCntDict);
+    // while((de = dictNext(di)) != NULL) {
+    //     serverLog(LL_NOTICE, "the key is %s", (char *)de->key);
+    //     serverLog(LL_NOTICE, "the cnt is %s", (char *)de->stat_set_commands);
+    // }
     
     dictEntry *tmpKey = dictFindParity(server.CntKeyDict, tmpCnt->stat_set_commands);
-    //serverLog(LL_NOTICE, "in the processRecoverySignalData, the tmpKey = %s", (char *)tmpKey->v.val);
+    serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)tmpKey->stat_set_commands);
+    serverLog(LL_NOTICE,"Entry->key1: %s", (char*)tmpKey->key);
+    serverLog(LL_NOTICE,"Entry->key2: %s", (char*)tmpKey->v.val);
+    serverLog(LL_NOTICE,"Entry->key3: %s", (char*)tmpKey->val_len); 
+
+    serverLog(LL_NOTICE, "in the processRecoverySignalData, the tmpKey = %s", (char *)tmpKey->v.val);
 
     dictEntry *reply_entry = dictFindParity(server.parityDict, tmpCnt->stat_set_commands);
 
@@ -2853,7 +2869,7 @@ int processRecoverySignalData(client *c){
     int flag4 = (tmpKey->val_len == NULL)? 0:1;
 
     int valLen = *(int*)reply_entry->val_len;
-    //serverLog(LL_NOTICE, "the valLen is %d", valLen);
+    serverLog(LL_NOTICE, "the valLen is %d", valLen);
 
     char *tmpdata1 = talloc(char, sizeof(char)*valLen);
     char *tmpdata4 = talloc(char, sizeof(char)*valLen);
@@ -2862,7 +2878,7 @@ int processRecoverySignalData(client *c){
     
     if((flag1 == 0) && (flag4 == 0)){
         addReplyBulkCString(c, (char *)reply_entry->v.val);
-        //serverLog(LL_NOTICE, "in the processRecoverySignalData, reply value directly, the value = %s", (char *)reply_entry->v.val);
+        serverLog(LL_NOTICE, "in the processRecoverySignalData, reply value directly, the value = %s", (char *)reply_entry->v.val);
         return C_OK;
     }
 
@@ -2934,7 +2950,7 @@ int processRecoverySignalData(client *c){
             // serverLog(LL_NOTICE, "before the memcpy, the tmpdata4 is %s", tmpdata4);
             // memcpy(tmpdata4, reply->str, strlen(reply->str));
             strcpy(tmpdata4, reply->str);
-            //serverLog(LL_NOTICE, "in the processRecoverySignalData, the tmpdata4 is %s", tmpdata4);
+            serverLog(LL_NOTICE, "in the processRecoverySignalData, the tmpdata4 is %s", tmpdata4);
         }
 
         freeReplyObject(reply);
@@ -2948,7 +2964,8 @@ int processRecoverySignalData(client *c){
 
     int *erasures;
     int dataLen = (strlen(tmpdata1)>strlen(tmpdata4))? strlen(tmpdata1) : strlen(tmpdata4);
-    int len = (dataLen > valLen)? dataLen : valLen;
+    // int len = (dataLen > valLen)? dataLen : valLen;
+    int len = dataLen;
 
     int k=3, m=2, w=8;
     char **data, **coding;
@@ -3005,7 +3022,7 @@ int processRecoverySignalData(client *c){
         // serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
 
         memcpy(recoveryData, data[0], sizeof(int));
-        //serverLog(LL_NOTICE,"after the encode, the recoveryData is %s and the len is %d", recoveryData, strlen(recoveryData));
+        serverLog(LL_NOTICE,"after the encode, the recoveryData is %s and the len is %d", recoveryData, strlen(recoveryData));
     }
 
     else{
@@ -3051,7 +3068,7 @@ int processRecoverySignalData(client *c){
             // serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
 
             strcat(recoveryData, data[0]);
-            //serverLog(LL_NOTICE,"after the encode, the recoveryData is %s and the len is %d", recoveryData, strlen(recoveryData));     
+            serverLog(LL_NOTICE,"after the encode, the recoveryData is %s and the len is %d", recoveryData, strlen(recoveryData));     
         }
     }
 
@@ -3093,7 +3110,7 @@ int processRecoveryAll(client *c){
         int flag4 = (tmpKey->val_len == NULL)? 0:1;
 
         int valLen = *(int*)de->val_len;
-        //serverLog(LL_NOTICE, "the valLen is %d", valLen);
+        serverLog(LL_NOTICE, "the valLen is %d", valLen);
 
         char *tmpdata1 = talloc(char, sizeof(char)*valLen);
         char *tmpdata4 = talloc(char, sizeof(char)*valLen);
@@ -3103,7 +3120,7 @@ int processRecoveryAll(client *c){
         if((flag1 == 0) && (flag4 == 0)){
             // addReplyBulkCString(c, (char *)de->v.val);
             dictAddRecovery(server.db->dict, tmpKey->key, de->v.val, de->stat_set_commands);
-            //serverLog(LL_NOTICE, "in the processRecoveryAll, Add value directly, the value = %s", (char *)de->v.val);
+            serverLog(LL_NOTICE, "in the processRecoveryAll, Add value directly, the value = %s", (char *)de->v.val);
             continue;
         }
 
@@ -3163,11 +3180,11 @@ int processRecoveryAll(client *c){
             //serverLog(LL_NOTICE, "in the processRecoverySignalData, the reply is %s, and the len is %d", reply->str, strlen(reply->str));
             if(port == 7001){
                 strcpy(tmpdata1, reply->str);
-                //serverLog(LL_NOTICE, "in the processRecoverySignalData, the tmpdata1 is %s", tmpdata1);
+                serverLog(LL_NOTICE, "in the processRecoverySignalData, the tmpdata1 is %s", tmpdata1);
             }
             else{
                 strcpy(tmpdata4, reply->str);
-                //serverLog(LL_NOTICE, "in the processRecoverySignalData, the tmpdata4 is %s", tmpdata4);
+                serverLog(LL_NOTICE, "in the processRecoverySignalData, the tmpdata4 is %s", tmpdata4);
             }
 
             freeReplyObject(reply);
@@ -3269,12 +3286,12 @@ int erasure_encode_firstkey(client *c, int keyFlag){
         else{
             return C_ERR;
         }
-        serverLog(LL_NOTICE, "in the erasure_encode_firstkey and len < 4: ");
-        serverLog(LL_NOTICE, "data[0]:   %02x %02x %02x %02x", (unsigned char)data[0][0], (unsigned char)data[0][1], (unsigned char)data[0][2], (unsigned char)data[0][3]);
-        serverLog(LL_NOTICE, "data[1]:   %02x %02x %02x %02x", (unsigned char)data[1][0], (unsigned char)data[1][1], (unsigned char)data[1][2], (unsigned char)data[1][3]);
-        serverLog(LL_NOTICE, "data[2]:   %02x %02x %02x %02x", (unsigned char)data[2][0], (unsigned char)data[2][1], (unsigned char)data[2][2], (unsigned char)data[2][3]);
-        serverLog(LL_NOTICE, "coding[0]: %02x %02x %02x %02x", (unsigned char)coding[0][0], (unsigned char)coding[0][1], (unsigned char)coding[0][2], (unsigned char)coding[0][3]);
-        serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
+        // serverLog(LL_NOTICE, "in the erasure_encode_firstkey and len < 4: ");
+        // serverLog(LL_NOTICE, "data[0]:   %02x %02x %02x %02x", (unsigned char)data[0][0], (unsigned char)data[0][1], (unsigned char)data[0][2], (unsigned char)data[0][3]);
+        // serverLog(LL_NOTICE, "data[1]:   %02x %02x %02x %02x", (unsigned char)data[1][0], (unsigned char)data[1][1], (unsigned char)data[1][2], (unsigned char)data[1][3]);
+        // serverLog(LL_NOTICE, "data[2]:   %02x %02x %02x %02x", (unsigned char)data[2][0], (unsigned char)data[2][1], (unsigned char)data[2][2], (unsigned char)data[2][3]);
+        // serverLog(LL_NOTICE, "coding[0]: %02x %02x %02x %02x", (unsigned char)coding[0][0], (unsigned char)coding[0][1], (unsigned char)coding[0][2], (unsigned char)coding[0][3]);
+        // serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
     }
 
     else{
@@ -3326,23 +3343,23 @@ int erasure_encode_firstkey(client *c, int keyFlag){
             }
             strcat(tmpval_1, tmpval[n]);
 
-            serverLog(LL_NOTICE, "in the erasure_encode_firstkey and len > 4, n=%d : ", n);
+            // serverLog(LL_NOTICE, "in the erasure_encode_firstkey and len > 4, n=%d : ", n);
 
-            serverLog(LL_NOTICE, "data[0]:   %02x %02x %02x %02x", (unsigned char)data[0][0], (unsigned char)data[0][1], (unsigned char)data[0][2], (unsigned char)data[0][3]);
-            serverLog(LL_NOTICE, "data[1]:   %02x %02x %02x %02x", (unsigned char)data[1][0], (unsigned char)data[1][1], (unsigned char)data[1][2], (unsigned char)data[1][3]);
-            serverLog(LL_NOTICE, "data[2]:   %02x %02x %02x %02x", (unsigned char)data[2][0], (unsigned char)data[2][1], (unsigned char)data[2][2], (unsigned char)data[2][3]);
-            serverLog(LL_NOTICE, "coding[0]: %02x %02x %02x %02x", (unsigned char)coding[0][0], (unsigned char)coding[0][1], (unsigned char)coding[0][2], (unsigned char)coding[0][3]);
-            serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
+            // serverLog(LL_NOTICE, "data[0]:   %02x %02x %02x %02x", (unsigned char)data[0][0], (unsigned char)data[0][1], (unsigned char)data[0][2], (unsigned char)data[0][3]);
+            // serverLog(LL_NOTICE, "data[1]:   %02x %02x %02x %02x", (unsigned char)data[1][0], (unsigned char)data[1][1], (unsigned char)data[1][2], (unsigned char)data[1][3]);
+            // serverLog(LL_NOTICE, "data[2]:   %02x %02x %02x %02x", (unsigned char)data[2][0], (unsigned char)data[2][1], (unsigned char)data[2][2], (unsigned char)data[2][3]);
+            // serverLog(LL_NOTICE, "coding[0]: %02x %02x %02x %02x", (unsigned char)coding[0][0], (unsigned char)coding[0][1], (unsigned char)coding[0][2], (unsigned char)coding[0][3]);
+            // serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
 
-            serverLog(LL_NOTICE, "final coding[0]: %02x %02x %02x %02x", (unsigned char)tmpval[0], (unsigned char)tmpval[1], (unsigned char)tmpval[2], (unsigned char)tmpval[3]);
+            // serverLog(LL_NOTICE, "final coding[0]: %02x %02x %02x %02x", (unsigned char)tmpval[0], (unsigned char)tmpval[1], (unsigned char)tmpval[2], (unsigned char)tmpval[3]);
 
         }
 
-        for(int count = 0; count < strlen(tmpval_1); count+=4){
-            serverLog(LL_NOTICE, "final coding firstkey result: %02x %02x %02x %02x",
-             (unsigned char)tmpval_1[count], (unsigned char)tmpval_1[count+1], 
-             (unsigned char)tmpval_1[count+2], (unsigned char)tmpval_1[count+3]);
-        }
+        // for(int count = 0; count < strlen(tmpval_1); count+=4){
+        //     serverLog(LL_NOTICE, "final coding firstkey result: %02x %02x %02x %02x",
+        //      (unsigned char)tmpval_1[count], (unsigned char)tmpval_1[count+1], 
+        //      (unsigned char)tmpval_1[count+2], (unsigned char)tmpval_1[count+3]);
+        // }
         
         for (i = 0; i < time; i++) {
             free(tmpval[i]); 
@@ -3388,11 +3405,11 @@ int erasure_encode_anotherkey(client *c, void *val_len, int keyFlag){
     serverLog(LL_NOTICE,"in the erasure_encode_anotherkey");
     dictEntry *codeEntry = dictFindParity(server.parityDict, (char*)c->argv[3]->ptr);
 
-    serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)codeEntry->stat_set_commands);
-    serverLog(LL_NOTICE,"Entry->key: %s", (char*)codeEntry->key);
-    serverLog(LL_NOTICE,"Entry->val: %s", (char*)codeEntry->v.val);
-    //serverLog(LL_NOTICE,"Entry->val_len: %d", *(int*)codeEntry->val_len);
-    serverLog(LL_NOTICE,"Entry->val_len: %s", (char*)codeEntry->val_len);
+    // serverLog(LL_NOTICE,"Entry->cnt: %s", (char *)codeEntry->stat_set_commands);
+    // serverLog(LL_NOTICE,"Entry->key: %s", (char*)codeEntry->key);
+    // serverLog(LL_NOTICE,"Entry->val: %s", (char*)codeEntry->v.val);
+    // //serverLog(LL_NOTICE,"Entry->val_len: %d", *(int*)codeEntry->val_len);
+    // serverLog(LL_NOTICE,"Entry->val_len: %s", (char*)codeEntry->val_len);
 
     int len;
     if(val_len != NULL){
@@ -3460,13 +3477,13 @@ int erasure_encode_anotherkey(client *c, void *val_len, int keyFlag){
             return C_ERR;
         }
 
-        serverLog(LL_NOTICE, "in the erasure_encode_anotherkey and len < 4 : ");
+        // serverLog(LL_NOTICE, "in the erasure_encode_anotherkey and len < 4 : ");
 
-        serverLog(LL_NOTICE, "data[0]:   %02x %02x %02x %02x", (unsigned char)data[0][0], (unsigned char)data[0][1], (unsigned char)data[0][2], (unsigned char)data[0][3]);
-        serverLog(LL_NOTICE, "data[1]:   %02x %02x %02x %02x", (unsigned char)data[1][0], (unsigned char)data[1][1], (unsigned char)data[1][2], (unsigned char)data[1][3]);
-        serverLog(LL_NOTICE, "data[2]:   %02x %02x %02x %02x", (unsigned char)data[2][0], (unsigned char)data[2][1], (unsigned char)data[2][2], (unsigned char)data[2][3]);
-        serverLog(LL_NOTICE, "coding[0]: %02x %02x %02x %02x", (unsigned char)coding[0][0], (unsigned char)coding[0][1], (unsigned char)coding[0][2], (unsigned char)coding[0][3]);
-        serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
+        // serverLog(LL_NOTICE, "data[0]:   %02x %02x %02x %02x", (unsigned char)data[0][0], (unsigned char)data[0][1], (unsigned char)data[0][2], (unsigned char)data[0][3]);
+        // serverLog(LL_NOTICE, "data[1]:   %02x %02x %02x %02x", (unsigned char)data[1][0], (unsigned char)data[1][1], (unsigned char)data[1][2], (unsigned char)data[1][3]);
+        // serverLog(LL_NOTICE, "data[2]:   %02x %02x %02x %02x", (unsigned char)data[2][0], (unsigned char)data[2][1], (unsigned char)data[2][2], (unsigned char)data[2][3]);
+        // serverLog(LL_NOTICE, "coding[0]: %02x %02x %02x %02x", (unsigned char)coding[0][0], (unsigned char)coding[0][1], (unsigned char)coding[0][2], (unsigned char)coding[0][3]);
+        // serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
     }
 
     else{
@@ -3517,22 +3534,22 @@ int erasure_encode_anotherkey(client *c, void *val_len, int keyFlag){
             strcat(tmpval_1, tmpval[n]);
             //serverLog(LL_NOTICE, "after encode, the tmpval_1 is %s", tmpval_1);
 
-            serverLog(LL_NOTICE, "in the erasure_encode_anotherkey and len > 4, n=%d : ", n);        
+            // serverLog(LL_NOTICE, "in the erasure_encode_anotherkey and len > 4, n=%d : ", n);        
         
-            serverLog(LL_NOTICE, "data[0]:   %02x %02x %02x %02x", (unsigned char)data[0][0], (unsigned char)data[0][1], (unsigned char)data[0][2], (unsigned char)data[0][3]);
-            serverLog(LL_NOTICE, "data[1]:   %02x %02x %02x %02x", (unsigned char)data[1][0], (unsigned char)data[1][1], (unsigned char)data[1][2], (unsigned char)data[1][3]);
-            serverLog(LL_NOTICE, "data[2]:   %02x %02x %02x %02x", (unsigned char)data[2][0], (unsigned char)data[2][1], (unsigned char)data[2][2], (unsigned char)data[2][3]);
-            serverLog(LL_NOTICE, "coding[0]: %02x %02x %02x %02x", (unsigned char)coding[0][0], (unsigned char)coding[0][1], (unsigned char)coding[0][2], (unsigned char)coding[0][3]);
-            serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
+            // serverLog(LL_NOTICE, "data[0]:   %02x %02x %02x %02x", (unsigned char)data[0][0], (unsigned char)data[0][1], (unsigned char)data[0][2], (unsigned char)data[0][3]);
+            // serverLog(LL_NOTICE, "data[1]:   %02x %02x %02x %02x", (unsigned char)data[1][0], (unsigned char)data[1][1], (unsigned char)data[1][2], (unsigned char)data[1][3]);
+            // serverLog(LL_NOTICE, "data[2]:   %02x %02x %02x %02x", (unsigned char)data[2][0], (unsigned char)data[2][1], (unsigned char)data[2][2], (unsigned char)data[2][3]);
+            // serverLog(LL_NOTICE, "coding[0]: %02x %02x %02x %02x", (unsigned char)coding[0][0], (unsigned char)coding[0][1], (unsigned char)coding[0][2], (unsigned char)coding[0][3]);
+            // serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
 
-            serverLog(LL_NOTICE, "final coding[0]: %02x %02x %02x %02x", (unsigned char)tmpval[0], (unsigned char)tmpval[1], (unsigned char)tmpval[2], (unsigned char)tmpval[3]);
+            // serverLog(LL_NOTICE, "final coding[0]: %02x %02x %02x %02x", (unsigned char)tmpval[0], (unsigned char)tmpval[1], (unsigned char)tmpval[2], (unsigned char)tmpval[3]);
         }
 
-        for(int count = 0; count < sizeof(int)*time; count+=4){
-            serverLog(LL_NOTICE, "final coding anotherkey result: %02x %02x %02x %02x",
-             (unsigned char)tmpval_1[count], (unsigned char)tmpval_1[count+1], 
-             (unsigned char)tmpval_1[count+2], (unsigned char)tmpval_1[count+3]);
-        }
+        // for(int count = 0; count < sizeof(int)*time; count+=4){
+        //     serverLog(LL_NOTICE, "final coding anotherkey result: %02x %02x %02x %02x",
+        //      (unsigned char)tmpval_1[count], (unsigned char)tmpval_1[count+1], 
+        //      (unsigned char)tmpval_1[count+2], (unsigned char)tmpval_1[count+3]);
+        // }
         for (i = 0; i < time; i++) {
             free(tmpval[i]); 
         }
@@ -3588,6 +3605,127 @@ int erasure_encode_anotherkey(client *c, void *val_len, int keyFlag){
     }
     free(coding);
     free(tmpval_1);
+
+    return C_OK;
+}
+
+int processConsumption(client *c){
+    dictIterator *di;
+    dictEntry *de;
+    double totalConsumption = 0.0;
+
+    double totalKey = 0.0;
+    double totalParity = 0.0;
+
+    if(server.port == 7000 || server.port == 7001 || server.port == 7004){
+        int dbEntryNum = 0;
+        int dbKey = 0;
+        int dbVal = 0;
+
+        di = dictGetSafeIterator(server.db->dict);
+        while((de = dictNext(di)) != NULL) {
+            dbEntryNum ++;
+
+            dbKey += strlen((char *)de->key);
+
+            robj *val = dictGetVal(de);
+            serverLog(LL_NOTICE, "dbVal = %s", (char *)val->ptr);
+            dbVal += strlen((char *)val->ptr);
+            
+            // serverLog(LL_NOTICE,"dbEntryNum = %d, dbKey + %d, dbVal + %d", \
+            // dbEntryNum, strlen((char *)de->key), strlen((char *)val->ptr));
+        }
+
+        totalConsumption = dbKey + dbVal;
+
+        serverLog(LL_NOTICE, "\n dbDict：\n dbEntryNum = %d \n dbKey = %d \n dbVal = %d \n total = %f B = %f MB", \
+        dbEntryNum, dbKey, dbVal, totalConsumption, totalConsumption/1048576);
+    }
+    else if(server.port == 7002 || server.port == 7003){
+        int parityEntryNum = 0;
+        int parityCnt = 0;
+        int parityVal = 0;
+        int parityValLen = 0;
+        double parityTotal = 0.0;
+
+        di = dictGetSafeIterator(server.parityDict);
+        while((de = dictNext(di)) != NULL) {
+            parityEntryNum ++;
+            parityCnt += strlen((char*)de->stat_set_commands);
+            parityVal += atoi((char*)de->val_len);
+            parityValLen += strlen((char*)de->val_len);
+            // serverLog(LL_NOTICE,"parityEntryNum = %d, parityCnt + %d, parityVal + %d, parityValLen + %d", \
+            // parityEntryNum, strlen((char*)de->stat_set_commands), atoi((char*)de->val_len), strlen((char*)de->val_len));
+        }
+
+        parityTotal = parityCnt + parityVal + parityValLen;
+
+        serverLog(LL_NOTICE, "\nparityDict：\nparityEntryNum = %d\nparityCnt = %d\nparityVal = %d\nparityValLen = %d\ntotal = %f B = %f MB", \
+        parityEntryNum, parityCnt, parityVal, parityValLen, parityTotal, parityTotal/1048576);
+
+        int keyEntryNum = 0;
+        int keyCnt = 0;
+        int keyKey = 0;
+        double keyTotal = 0.0;
+
+        di = dictGetSafeIterator(server.KeyCntDict);
+        while((de = dictNext(di)) != NULL) {
+            keyEntryNum ++;
+            keyCnt += strlen((char*)de->stat_set_commands);
+            keyKey += strlen((char*)de->key);
+            // serverLog(LL_NOTICE,"keyEntryNum = %d, keyCnt + %d, keyKey + %d", \
+            // keyEntryNum, strlen((char*)de->stat_set_commands), strlen((char*)de->key));
+        }
+
+        keyTotal = keyCnt + keyKey;
+
+        serverLog(LL_NOTICE, "\nKeyCntDict：\nkeyEntryNum = %d\nkeyCnt = %d\nkeyKey = %d\ntotal = %f B = %f MB", \
+        keyEntryNum, keyCnt, keyKey, parityValLen, keyTotal, keyTotal/1048576);
+
+        int cntEntryNum = 0;
+        int cntCnt = 0;
+        int cntKey1 = 0;
+        int cntKey2 = 0;
+        int cntKey3 = 0;
+        double cntTotal = 0.0;
+
+        di = dictGetSafeIterator(server.CntKeyDict);
+        while((de = dictNext(di)) != NULL) {
+            cntEntryNum ++;
+            cntCnt += strlen((char*)de->stat_set_commands);
+            if(de->key != NULL)
+                cntKey1 += strlen((char *)de->key);
+            if(de->v.val != NULL)
+                cntKey2 += strlen((char *)de->v.val);
+            if(de->val_len != NULL)
+                cntKey3 += strlen((char *)de->val_len);
+            // serverLog(LL_NOTICE,"cntEntryNum = %d, cntCnt = %d, cntKey1 = %d, cntKey2 = %d, cntKey3 = %d", \
+            // cntEntryNum, cntCnt, cntKey1, cntKey2, cntKey3);
+        }
+
+        cntTotal = cntCnt + cntKey1 + cntKey2 + cntKey3;
+
+        serverLog(LL_NOTICE, "\n KeyCntDict：\n cntEntryNum = %d \n cntCnt = %d \n cntKey1 = %d \n cntKey2 = %d \n cntKey3 = %d \n total = %f B = %f MB", \
+        cntEntryNum, cntCnt, cntKey1, cntKey2, cntKey3, keyTotal, keyTotal/1048576);
+
+        totalConsumption = parityTotal + keyTotal + cntTotal;
+        serverLog(LL_NOTICE, "totalConsumption = %f B = %f MB", totalConsumption, totalConsumption/1048576);
+
+        totalKey = keyTotal + cntTotal;
+        totalParity = parityTotal;
+    }
+    else{
+        serverLog(LL_NOTICE, "Error: server.port != 7000 or 7002 or 7003");
+        return C_ERR;
+    }
+
+    char *replyStr = (char *) malloc(sizeof(char)*100);
+    memset(replyStr, 0, sizeof(char)*100);
+    sprintf(replyStr, "port = %d, totalKey = %f MB, totalParity = %f MB, totalConsumption = %f MB", server.port, totalKey/1048576, totalParity/1048576, totalConsumption/1048576); 
+    addReplyBulkCString(c,replyStr);
+    free(replyStr);
+
+    dictReleaseIterator(di);
 
     return C_OK;
 }
@@ -5038,7 +5176,7 @@ int main(int argc, char **argv) {
             //child7002
             int msgport = 7002;
             serverLog(LL_NOTICE, "in the pid7002");
-            if(feedParityAsyncAll(msgport) == C_OK){
+            if(feedParityPipelineAll(msgport) == C_OK){
                 exitFromChild(0);
             }
             else{
@@ -5050,7 +5188,7 @@ int main(int argc, char **argv) {
                 //child7003
                 int msgport = 7003;
                 serverLog(LL_NOTICE, "in the pid7003");
-                if(feedParityAsyncAll(msgport) == C_OK){
+                if(feedParityPipelineAll(msgport) == C_OK){
                     exitFromChild(0);
                 }
                 else{

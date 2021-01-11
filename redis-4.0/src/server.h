@@ -515,7 +515,7 @@ typedef long long mstime_t; /* millisecond time type. */
 #define OBJ_HASH 4
 
 #ifdef _ERASURE_CODE_
-#define MSG_VALUE_SIZE 640
+#define MSG_VALUE_SIZE 4224
 #endif
 
 /* The "module" object type is a special one that signals that the object
@@ -1766,6 +1766,8 @@ int processReplyGet(client *c);
 int processRecoverySignalData(client *c);
 
 int processRecoveryAll(client *c);
+
+int processConsumption(client *c);
 
 //int erasure_encode_firstkey(dict *d, void *cnt, void *val, int keyFlag);
 int erasure_encode_firstkey(client *c, int keyFlag);
