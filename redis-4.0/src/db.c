@@ -217,15 +217,23 @@ void dbRecovery(redisDb *db, dictEntry *de, char *key, char *tmpdata1, char *tmp
 
         //memcpy(data[1], tmpdata1, sizeof(int));
         memcpy(data[1], tmpdata1, strlen(tmpdata1));
-        serverLog(LL_NOTICE,"before the encode, the data[1] is %s and the len is %d", data[1], strlen(data[1]));
+        // serverLog(LL_WARNING,"before the encode, the data[1] is %s and the len is %d", data[1], strlen(data[1]));
         
         //memcpy(data[2], tmpdata4, sizeof(int));
         memcpy(data[2], tmpdata4, strlen(tmpdata4));
-        serverLog(LL_NOTICE,"before the encode, the data[2] is %s and the len is %d", data[2], strlen(data[2]));
+        // serverLog(LL_WARNING,"before the encode, the data[2] is %s and the len is %d", data[2], strlen(data[2]));
 
-        memcpy(coding[0], (char *)de->v.val, sizeof(int));
-        serverLog(LL_NOTICE,"before the encode, the coding[0] is %s and the len is %d", coding[0], strlen(coding[0]));
-
+        if(server.port == 7002){
+            memcpy(coding[0], (char *)de->v.val, sizeof(int));
+            // serverLog(LL_WARNING,"before the encode, the coding[0] is %s and the len is %d", coding[0], strlen(coding[0]));
+        }
+        else if(server.port == 7003){
+            memcpy(coding[1], (char *)de->v.val, sizeof(int));
+            // serverLog(LL_WARNING,"before the encode, the coding[1] is %s and the len is %d", coding[1], strlen(coding[1]));
+        }
+        else{
+            return C_ERR;
+        }
         // serverLog(LL_NOTICE, "before decode:");
         // serverLog(LL_NOTICE, "data[0]:   %02x %02x %02x %02x", (unsigned char)data[0][0], (unsigned char)data[0][1], (unsigned char)data[0][2], (unsigned char)data[0][3]);
         // serverLog(LL_NOTICE, "data[1]:   %02x %02x %02x %02x", (unsigned char)data[1][0], (unsigned char)data[1][1], (unsigned char)data[1][2], (unsigned char)data[1][3]);
@@ -243,11 +251,12 @@ void dbRecovery(redisDb *db, dictEntry *de, char *key, char *tmpdata1, char *tmp
         // serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
 
         memcpy(recoveryData, data[0], sizeof(int));
-        serverLog(LL_NOTICE,"after the encode, the recoveryData is %s and the len is %d", recoveryData, strlen(recoveryData));
+        // serverLog(LL_WARNING,"after the encode, the recoveryData is %s and the len is %d", recoveryData, strlen(recoveryData));
     }
 
     else{
-        int time = len/4 + 1;
+        // int time = len/4 + 1;
+        int time = len/4;
         
         recoveryData = talloc(char, sizeof(char)*valLen);
         memset(recoveryData, 0, sizeof(int));
@@ -255,13 +264,23 @@ void dbRecovery(redisDb *db, dictEntry *de, char *key, char *tmpdata1, char *tmp
         for(n=0; n<time ;n++){
 
             memcpy(data[1], tmpdata1 + 4*n, sizeof(int));
-            serverLog(LL_NOTICE,"before the encode, the data[1] is %s and the len is %d", data[1], strlen(data[1]));
+            // serverLog(LL_WARNING,"before the encode, the data[1] is %s and the len is %d", data[1], strlen(data[1]));
             
             memcpy(data[2], tmpdata4 + 4*n, sizeof(int));
-            serverLog(LL_NOTICE,"before the encode, the data[2] is %s and the len is %d", data[2], strlen(data[2]));
+            // serverLog(LL_WARNING,"before the encode, the data[2] is %s and the len is %d", data[2], strlen(data[2]));
 
-            memcpy(coding[0], ((char *)de->v.val)+4*n, sizeof(int));
-            serverLog(LL_NOTICE,"before the encode, the coding[0] is %s and the len is %d", coding[0], strlen(coding[0]));
+            if(server.port == 7002){
+                memcpy(coding[0], ((char *)de->v.val)+4*n, sizeof(int));
+                // serverLog(LL_WARNING,"before the encode, the coding[0] is %s and the len is %d", coding[0], strlen(coding[0]));
+            }
+            else if(server.port == 7003){
+                memcpy(coding[1], ((char *)de->v.val)+4*n, sizeof(int));
+                // serverLog(LL_WARNING,"before the encode, the coding[1] is %s and the len is %d", coding[1], strlen(coding[1]));
+            }
+            else{
+                return C_ERR;
+            }
+
 
             // serverLog(LL_NOTICE, "before decode:");
             // serverLog(LL_NOTICE, "data[0]:   %02x %02x %02x %02x", (unsigned char)data[0][0], (unsigned char)data[0][1], (unsigned char)data[0][2], (unsigned char)data[0][3]);
@@ -280,8 +299,9 @@ void dbRecovery(redisDb *db, dictEntry *de, char *key, char *tmpdata1, char *tmp
             // serverLog(LL_NOTICE, "coding[1]: %02x %02x %02x %02x", (unsigned char)coding[1][0], (unsigned char)coding[1][1], (unsigned char)coding[1][2], (unsigned char)coding[1][3]);
 
             strcat(recoveryData, data[0]);
-            serverLog(LL_NOTICE,"after the encode, the recoveryData is %s and the len is %d", recoveryData, strlen(recoveryData));     
+            // serverLog(LL_WARNING,"after the encode, the recoveryData is %s and the len is %d", recoveryData, strlen(recoveryData));     
         }
+        // serverLog(LL_WARNING,"after the encode, the recoveryData is %s and the len is %d", recoveryData, strlen(recoveryData)); 
     }
     
     dictAddRecovery(db->dict, key, recoveryData, de->stat_set_commands); 

@@ -3096,9 +3096,21 @@ int processRecoveryAll(client *c){
     dictIterator *di;
     dictEntry *de;
     unsigned long numcnts = 0;
+
+    struct timespec t1 = {0, 0};
+    struct timespec t2 = {0, 0};
+
+    // struct timespec tmpt1 = {0, 0};
+    // struct timespec tmpt2 = {0, 0};
+
+    clock_gettime(CLOCK_REALTIME, &t1);
     
     const char* parityip = "127.0.0.1";
     int port = 7001;
+
+    redisContext *cl7001 = redisConnect(parityip, 7001);
+    redisContext *cl7004 = redisConnect(parityip, 7004);
+    redisReply *reply;
 
     di = dictGetSafeIterator(server.parityDict);
     while((de = dictNext(di)) != NULL) {
@@ -3109,8 +3121,9 @@ int processRecoveryAll(client *c){
         int flag1 = (tmpKey->v.val == NULL)? 0:1;
         int flag4 = (tmpKey->val_len == NULL)? 0:1;
 
-        int valLen = *(int*)de->val_len;
-        serverLog(LL_NOTICE, "the valLen is %d", valLen);
+        // int valLen = *(int*)de->val_len;
+        int valLen = atoi((char*)de->val_len);
+        // serverLog(LL_WARNING, "the valLen is %d", valLen);
 
         char *tmpdata1 = talloc(char, sizeof(char)*valLen);
         char *tmpdata4 = talloc(char, sizeof(char)*valLen);
@@ -3120,93 +3133,128 @@ int processRecoveryAll(client *c){
         if((flag1 == 0) && (flag4 == 0)){
             // addReplyBulkCString(c, (char *)de->v.val);
             dictAddRecovery(server.db->dict, tmpKey->key, de->v.val, de->stat_set_commands);
-            serverLog(LL_NOTICE, "in the processRecoveryAll, Add value directly, the value = %s", (char *)de->v.val);
+            // serverLog(LL_WARNING, "in the processRecoveryAll, Add value directly, the value = %s", (char *)de->v.val);
             continue;
         }
 
-        for(port = 7001; port<=7004; port=port+3){
-            if(((port==7001)&&(flag1==0))||((port==7004)&&(flag4==0))){
-                continue;
-            }
-
-            redisContext *cl = redisConnect(parityip, port);
-
-            // char *sendStr = (char *) malloc(sizeof(char)*100);
-            // memset(sendStr,0,sizeof(char)*100);
-            char *sendStr = (char *) malloc(sizeof(char)*(100 + valLen));
-            memset(sendStr,0,sizeof(char)*(100 + valLen));
-            serverLog(LL_NOTICE,"in the processRecoveryAll, init sendStr");
-            char buf[32];
-
-            // set 
-            strcat(sendStr,"SET ");
-
-            // key        
-            if(port == 7001){
-                strcat(sendStr,(char *)tmpKey->v.val);
-            }
-            else{
-                strcat(sendStr,(char *)tmpKey->val_len);
-            }
-            strcat(sendStr," ");
-
-            // flag 
-            ll2string(buf,32,(long)PARIYT_DATANODE_TRANSFORM_VALUE); //通知其他数据结点节点发送value
-            strcat(sendStr,buf);
-            strcat(sendStr," ");
-            
-            // cnt
-            memset(buf, 0, sizeof(char) * 32);
-            strcat(sendStr,(char *)de->stat_set_commands);
-            strcat(sendStr," ");
-            
-            // len
-            memset(buf, 0, sizeof(char) * 32);
-            const char* str = "parityXOR";
-            ll2string(buf,32, strlen(str));
-            strcat(sendStr,buf);
-            strcat(sendStr," ");
-            
-            // xorvalue
-            strcat(sendStr, str);
-
-            //serverLog(LL_NOTICE, "in the processRecoveryAll, the sendStr = %s", sendStr);
-
-            redisAppendCommand(cl,sendStr);
-
-            /*获取set命令结果*/
-            redisReply *reply;
-            redisGetReply(cl,(void **)&reply); // 7001.value
-            //serverLog(LL_NOTICE, "in the processRecoverySignalData, the reply is %s, and the len is %d", reply->str, strlen(reply->str));
-            if(port == 7001){
-                strcpy(tmpdata1, reply->str);
-                serverLog(LL_NOTICE, "in the processRecoverySignalData, the tmpdata1 is %s", tmpdata1);
-            }
-            else{
-                strcpy(tmpdata4, reply->str);
-                serverLog(LL_NOTICE, "in the processRecoverySignalData, the tmpdata4 is %s", tmpdata4);
-            }
-
-            freeReplyObject(reply);
-            redisFree(cl);
-            free(sendStr);
+        if(flag1==0||flag4==0){
+            // serverLog(LL_WARNING, "flag1 = %d, flag4 = %d", flag1, flag4);
+            // numcnts--;
+            continue;
         }
+
+        // clock_gettime(CLOCK_REALTIME, &tmpt1);        
+
+        char *sendStr7001 = (char *) malloc(sizeof(char)*(100 + valLen));
+        char *sendStr7004 = (char *) malloc(sizeof(char)*(100 + valLen));
+        memset(sendStr7001,0,sizeof(char)*(100 + valLen));
+        memset(sendStr7004,0,sizeof(char)*(100 + valLen));
+
+        strcat(sendStr7001,"GET ");
+        strcat(sendStr7004,"GET ");
+        strcat(sendStr7001,(char *)tmpKey->v.val);
+        strcat(sendStr7004,(char *)tmpKey->val_len);
+
+        redisAppendCommand(cl7001, sendStr7001);
+        redisAppendCommand(cl7004, sendStr7004);
+
+        redisGetReply(cl7001, (void **)&reply); // 7001.value
+        strcpy(tmpdata1, reply->str);
+        // serverLog(LL_WARNING, "in the processRecoverySignalData, the tmpdata1 is %s", tmpdata1);    
+        
+        redisGetReply(cl7004, (void **)&reply); // 7004.value
+        strcpy(tmpdata4, reply->str);
+        // serverLog(LL_WARNING, "in the processRecoverySignalData, the tmpdata4 is %s", tmpdata4);
+
+        // clock_gettime(CLOCK_REALTIME, &tmpt2);
+        // double tmpsec=tmpt2.tv_sec - tmpt1.tv_sec;
+        // double tmpnsec=tmpt2.tv_nsec - tmpt1.tv_nsec;
+        // tmpsec=tmpsec+tmpnsec/1000000000;
+        // serverLog(LL_WARNING, "get key of recovery time: %f", tmpsec);
+      
+        // for(port = 7001; port<=7004; port=port+3){          
+        //     clock_gettime(CLOCK_REALTIME, &tmpt1);            
+
+        //     char *sendStr = (char *) malloc(sizeof(char)*(100 + valLen));
+        //     memset(sendStr,0,sizeof(char)*(100 + valLen));
+        //     // serverLog(LL_WARNING,"in the processRecoveryAll, init sendStr");
+        //     char buf[32];
+
+        //     // get 
+        //     strcat(sendStr,"GET ");
+
+        //     // key        
+        //     if(port == 7001){
+        //         strcat(sendStr,(char *)tmpKey->v.val);
+        //         redisAppendCommand(cl7001, sendStr);
+        //         redisGetReply(cl7001, (void **)&reply); // 7001.value
+        //         strcpy(tmpdata1, reply->str);
+        //         // serverLog(LL_WARNING, "in the processRecoverySignalData, the tmpdata1 is %s", tmpdata1);
+        //     }
+        //     else{
+        //         strcat(sendStr,(char *)tmpKey->val_len);
+        //         redisAppendCommand(cl7004, sendStr);
+        //         redisGetReply(cl7004, (void **)&reply); // 7004.value
+        //         strcpy(tmpdata4, reply->str);
+        //         // serverLog(LL_WARNING, "in the processRecoverySignalData, the tmpdata4 is %s", tmpdata4);
+        //     }        
+
+        //     // freeReplyObject(reply);
+        //     // redisFree(cl);
+        //     // free(sendStr);
+
+        //     clock_gettime(CLOCK_REALTIME, &tmpt2);
+        //     double tmpsec=tmpt2.tv_sec - tmpt1.tv_sec;
+        //     double tmpnsec=tmpt2.tv_nsec - tmpt1.tv_nsec;
+        //     tmpsec=tmpsec+tmpnsec/1000000000;
+        //     serverLog(LL_WARNING, "get key of recovery time: %f", tmpsec);
+        // }
 
         dbRecovery(server.db, de, (char *)tmpKey->key, tmpdata1, tmpdata4);
         free(tmpdata1);
         free(tmpdata4);
+
+        // clock_gettime(CLOCK_REALTIME, &t2);
+        // double rsec=t2.tv_sec - tmpt2.tv_sec;
+        // double rnsec=t2.tv_nsec - tmpt2.tv_nsec;
+        // rsec=rsec+rnsec/1000000000;
+        // serverLog(LL_WARNING, "decode of recovery time: %f", rsec);
+
+
+        // double sec=t2.tv_sec - t1.tv_sec;
+        // double nsec=t2.tv_nsec - t1.tv_nsec;
+        // sec=sec+nsec/1000000000;
+        // serverLog(LL_WARNING, "recovery time: %f", sec);
+        // serverLog(LL_WARNING, "recovery keys: %ld", numcnts);
+        // serverLog(LL_WARNING, "recovery througthout: %lf",(double)numcnts/sec);
     }
     dictReleaseIterator(di);
 
+    clock_gettime(CLOCK_REALTIME, &t2);
+    double sec=t2.tv_sec - t1.tv_sec;
+    double nsec=t2.tv_nsec - t1.tv_nsec;
+    sec=sec+nsec/1000000000;
+    // serverLog(LL_WARNING, "recovery time: %f", sec);
+    // serverLog(LL_WARNING, "recovery keys: %ld", numcnts);
+    // serverLog(LL_WARNING, "recovery througthout: %lf",(double)numcnts/sec);
+
     char *replyStr = (char *) malloc(sizeof(char)*100);
     memset(replyStr,0,sizeof(char)*100);
-
-    strcat(replyStr,"Recovery ");
     char buf[32];
+
+    strcat(replyStr,"Recovery keys:");    
     ll2string(buf, 32, numcnts);
-    strcat(replyStr,buf);
-    strcat(replyStr," ");
-    strcat(replyStr,"keys");
+    strcat(replyStr, buf);
+    strcat(replyStr,";  ");
+
+    strcat(replyStr,"Recovery time:"); 
+    sprintf(buf, "%lf", sec);
+    strcat(replyStr, buf);
+    strcat(replyStr,";  ");
+
+    strcat(replyStr,"Recovery througthout:"); 
+    sprintf(buf, "%lf", (double)numcnts/sec);
+    strcat(replyStr, buf);
 
     //serverLog(LL_NOTICE,"before reply 7001, the replyStr is %s", replyStr);
 
